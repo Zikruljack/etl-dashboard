@@ -83,7 +83,7 @@ const props = defineProps<{
   datasetId: string;
 }>();
 
-const { $api } = useNuxtApp();
+const { $api } = useApi();
 
 const syncs = ref<DatasetSync[]>([]);
 const loading = ref(false);
@@ -96,7 +96,7 @@ async function fetchSyncs() {
   loading.value = true;
   error.value = '';
   try {
-    const res = await $api<{ data: DatasetSync[] }>(`/api/datasets/${props.datasetId}/syncs`);
+    const res = await $api<{ data: DatasetSync[] }>(`/datasets/${props.datasetId}/syncs`);
     syncs.value = res.data ?? [];
   } catch (err: unknown) {
     error.value = err instanceof Error ? err.message : 'Failed to load sync history';

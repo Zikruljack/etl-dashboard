@@ -113,7 +113,7 @@ const effectiveColumns = computed(() => props.columns ?? []);
           type="text"
           class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-800 font-medium"
           placeholder="Pipeline name"
-          @input="isDirty"
+          v-onInput="isDirty"
         />
       </div>
 

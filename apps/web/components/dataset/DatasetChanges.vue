@@ -130,7 +130,7 @@ const props = withDefaults(defineProps<{
   syncId: undefined,
 });
 
-const { $api } = useNuxtApp();
+const { $api } = useApi();
 
 interface ChangeRecord {
   id: string;
@@ -169,7 +169,7 @@ async function fetchChanges() {
     if (filterChangeType.value) params.set('changeType', filterChangeType.value);
 
     const res = await $api<{ data: ChangeRecord[]; pagination: { total: number } }>(
-      `/api/datasets/${props.datasetId}/changes?${params}`,
+      `/datasets/${props.datasetId}/changes?${params}`,
     );
     changes.value = res.data ?? [];
     total.value = res.pagination?.total ?? 0;

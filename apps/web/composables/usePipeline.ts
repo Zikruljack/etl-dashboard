@@ -26,7 +26,7 @@ export interface DraftStep {
  * @returns Reactive pipeline state and action functions
  */
 export function usePipeline(datasetId: Ref<string>) {
-  const { $api } = useNuxtApp();
+  const { $api } = useApi();
 
   // ─── State ────────────────────────────────────────────────────────────────
   const pipeline = ref<Pipeline | null>(null);

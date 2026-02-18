@@ -114,7 +114,7 @@
               :value="getColumnLabel(idx, header)"
               @blur="setColumnLabel(idx, header, ($event.target as HTMLInputElement).value)"
               class="px-2.5 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md text-xs hover:border-blue-300 dark:hover:border-blue-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-colors bg-white dark:bg-gray-800 dark:text-gray-100"
-              :class="config.columnLabels[String(idx + config.columnStart)] ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700' : ''"
+              :class="config.columnLabels[String(includeIndices[idx] ?? (idx + (config.columnStart || 0)))] ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700' : ''"
             />
           </span>
         </div>
@@ -186,6 +186,26 @@ const emit = defineEmits<{
 /** Limit preview display rows for performance */
 const previewDisplayRows = computed(() => {
   return props.preview?.rows.slice(0, 50) ?? [];
+});
+
+/**
+ * Compute the actual global column indices that are included in extraction.
+ * Mirrors the backend applyExtraction logic: range [columnStart, columnEnd) minus excludeColumns.
+ * Used to correctly map visible column positions (in preview.headers) to their global index,
+ * which is essential for correctly reading/writing columnLabels.
+ */
+const includeIndices = computed<number[]>(() => {
+  const colStart = props.config.columnStart || 0;
+  const colEnd =
+    props.config.columnEnd !== null && props.config.columnEnd !== undefined
+      ? props.config.columnEnd + 1
+      : props.totalCols;
+  const excludeSet = new Set(props.config.excludeColumns || []);
+  const indices: number[] = [];
+  for (let gi = colStart; gi < colEnd; gi++) {
+    if (!excludeSet.has(gi)) indices.push(gi);
+  }
+  return indices;
 });
 
 /**
@@ -263,20 +283,25 @@ function handleRowSkip(rowIdx: number) {
 
 /**
  * Handle click on a column letter header: toggle column exclusion.
+ * When a column is excluded, its columnLabels entry is cleaned up to avoid
+ * stale labels appearing on subsequent visible columns.
  *
  * @param colIdx - 0-based global column index
  */
 function handleColToggle(colIdx: number) {
   const excludeColumns = [...(props.config.excludeColumns || [])];
+  const labels = { ...props.config.columnLabels };
   const idx = excludeColumns.indexOf(colIdx);
   if (idx >= 0) {
     excludeColumns.splice(idx, 1);
   } else {
     excludeColumns.push(colIdx);
     excludeColumns.sort((a, b) => a - b);
+    // Clean up the label for the excluded column so it doesn't
+    // appear on the wrong column in the labels editor
+    delete labels[String(colIdx)];
   }
-  const updated = { ...props.config, excludeColumns };
-  console.log('[ExtractionGrid] Column toggle:', colIdx, 'New excludeColumns:', excludeColumns);
+  const updated = { ...props.config, excludeColumns, columnLabels: labels };
   emit('update:config', updated);
   // Request preview immediately for column toggle (no debounce)
   emit('request-preview');
@@ -284,17 +309,28 @@ function handleColToggle(colIdx: number) {
 
 /**
  * Get the display label for a column.
+ * Uses the actual global index from includeIndices to correctly map
+ * the visible column position to its columnLabels entry.
+ *
+ * @param idx - 0-based position in preview.headers (among visible columns)
+ * @param defaultHeader - Fallback if no custom label is set
  */
 function getColumnLabel(idx: number, defaultHeader: string): string {
-  const globalIdx = idx + (props.config.columnStart || 0);
+  const globalIdx = includeIndices.value[idx] ?? (idx + (props.config.columnStart || 0));
   return props.config.columnLabels[String(globalIdx)] || defaultHeader;
 }
 
 /**
  * Set a custom label for a column.
+ * Uses the actual global index from includeIndices so the label is stored
+ * under the key the backend expects, even when columns are excluded.
+ *
+ * @param idx - 0-based position in preview.headers (among visible columns)
+ * @param originalHeader - The auto-generated header name (used to detect no-op)
+ * @param newLabel - New label from user input
  */
 function setColumnLabel(idx: number, originalHeader: string, newLabel: string) {
-  const globalIdx = idx + (props.config.columnStart || 0);
+  const globalIdx = includeIndices.value[idx] ?? (idx + (props.config.columnStart || 0));
   const labels = { ...props.config.columnLabels };
 
   if (newLabel.trim() && newLabel.trim() !== originalHeader) {

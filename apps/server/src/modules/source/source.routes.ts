@@ -36,6 +36,7 @@ const extractionConfigSchema = z.object({
   columnStart: z.number().int().min(0).default(0),
   columnEnd: z.number().int().min(0).nullable().default(null),
   skipRows: z.array(z.number().int().min(0)).default([]),
+  excludeColumns: z.array(z.number().int().min(0)).nullable().default(null),
   keyColumns: z.array(z.string()).default([]),
   columnLabels: z.record(z.string(), z.string()).default({}),
 });

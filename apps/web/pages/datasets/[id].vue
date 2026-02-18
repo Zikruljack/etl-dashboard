@@ -288,7 +288,7 @@
 
       <!-- Tab: Pipeline -->
       <div v-if="activeTab === 'pipeline'">
-        <PipelinePipelineEditor
+        <PipelineEditor
           :dataset-id="String(route.params.id)"
           :sample-rows="pipelineSampleRows"
           :columns="dataset.columns?.map(c => c.name) ?? []"
