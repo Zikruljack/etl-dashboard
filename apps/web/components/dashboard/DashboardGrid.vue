@@ -24,6 +24,8 @@
         :w="item.w"
         :h="item.h"
         :i="item.i"
+        :is-draggable="editable"
+        :is-resizable="editable"
         class="grid-item-wrapper"
       >
         <ComponentWrapper
@@ -49,14 +51,36 @@ const emit = defineEmits<{
   'remove': [id: string];
 }>();
 
-const layout = computed(() =>
-  props.components.map((c) => ({
-    i: c.i || c.id,
-    x: c.layout.x,
-    y: c.layout.y,
-    w: c.layout.w,
-    h: c.layout.h,
-  })),
+// Use shallowRef to prevent deep reactivity that causes infinite loops with vue-grid-layout
+const layout = shallowRef<any[]>([]);
+
+// Track previous layout to avoid unnecessary updates
+let previousLayoutKey = '';
+
+// Watch for changes in components and update layout
+watch(
+  () => props.components,
+  (newComponents) => {
+    const newLayout = newComponents
+      .filter((c) => c?.layout && (c.i || c.id))
+      .map((c) => ({
+        i: c.i || c.id,
+        x: c.layout.x,
+        y: c.layout.y,
+        w: c.layout.w,
+        h: c.layout.h,
+      }));
+    
+    // Create a key to detect actual changes
+    const newKey = newLayout.map((l) => `${l.i}:${l.x}:${l.y}:${l.w}:${l.h}`).join('|');
+    
+    // Only update if layout actually changed
+    if (newKey !== previousLayoutKey) {
+      previousLayoutKey = newKey;
+      layout.value = newLayout;
+    }
+  },
+  { immediate: true },
 );
 
 function getComponent(id: string) {
@@ -64,7 +88,14 @@ function getComponent(id: string) {
 }
 
 function onLayoutUpdated(newLayout: any[]) {
-  emit('layout-updated', newLayout);
+  const normalizedLayout = newLayout
+    .filter((l) => l?.i)
+    .map((l) => ({ ...l }));
+
+  // Only update previousLayoutKey (so watcher skips this change) — do NOT reassign layout.value
+  // here as that would re-trigger vue-grid-layout causing infinite recursion.
+  previousLayoutKey = normalizedLayout.map((l) => `${l.i}:${l.x}:${l.y}:${l.w}:${l.h}`).join('|');
+  emit('layout-updated', normalizedLayout);
 }
 </script>
 

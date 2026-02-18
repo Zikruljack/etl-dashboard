@@ -108,22 +108,36 @@ async function loadData() {
 
     const rows = res.data?.data ?? [];
     const col = props.config.valueColumn;
-    const nums = rows
-      .map((r) => Number(r[col]))
-      .filter((n) => !isNaN(n));
-
-    if (nums.length === 0) {
-      rawValue.value = 0;
-      return;
-    }
 
     switch (props.config.aggregation) {
-      case 'sum':   rawValue.value = nums.reduce((a, b) => a + b, 0); break;
-      case 'avg':   rawValue.value = nums.reduce((a, b) => a + b, 0) / nums.length; break;
-      case 'count': rawValue.value = nums.length; break;
-      case 'min':   rawValue.value = Math.min(...nums); break;
-      case 'max':   rawValue.value = Math.max(...nums); break;
-      default:      rawValue.value = nums.reduce((a, b) => a + b, 0);
+      case 'count': {
+        // Count rows with non-empty values (not null, undefined, or empty string)
+        const count = rows.filter((r) => {
+          const val = r[col];
+          return val !== null && val !== undefined && val !== '';
+        }).length;
+        rawValue.value = count;
+        break;
+      }
+      default: {
+        // For numeric aggregations, convert to numbers and filter NaN
+        const nums = rows
+          .map((r) => Number(r[col]))
+          .filter((n) => !isNaN(n));
+
+        if (nums.length === 0) {
+          rawValue.value = 0;
+          break;
+        }
+
+        switch (props.config.aggregation) {
+          case 'sum':   rawValue.value = nums.reduce((a, b) => a + b, 0); break;
+          case 'avg':   rawValue.value = nums.reduce((a, b) => a + b, 0) / nums.length; break;
+          case 'min':   rawValue.value = Math.min(...nums); break;
+          case 'max':   rawValue.value = Math.max(...nums); break;
+          default:      rawValue.value = nums.reduce((a, b) => a + b, 0);
+        }
+      }
     }
   } catch (e) {
     console.error('WidgetKPI load failed', e);
@@ -132,8 +146,13 @@ async function loadData() {
   }
 }
 
+// Watch only specific stable values, not nested properties
 watch(
-  () => [props.datasetId, props.config?.valueColumn, props.config?.aggregation],
+  () => ({
+    datasetId: props.datasetId,
+    valueColumn: props.config?.valueColumn,
+    aggregation: props.config?.aggregation,
+  }),
   loadData,
   { immediate: true },
 );

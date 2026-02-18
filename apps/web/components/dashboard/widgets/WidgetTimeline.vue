@@ -1,6 +1,12 @@
 <template>
   <div class="h-full overflow-auto">
     <div v-if="loading" class="flex items-center justify-center h-full text-gray-400 text-sm">Loading...</div>
+    <div v-else-if="error" class="flex items-center justify-center h-full text-red-500 text-sm">
+      <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      {{ error }}
+    </div>
     <div v-else-if="!datasetId" class="flex items-center justify-center h-full text-gray-400 text-sm">
       Select a dataset
     </div>
@@ -50,25 +56,44 @@ const { $api } = useApi();
 
 const data = ref<Record<string, unknown>[]>([]);
 const loading = ref(false);
+const error = ref<string | null>(null);
 
 const events = computed(() => {
+  if (!props.config?.dateColumn || !props.config?.titleColumn) return [];
+
   return data.value
-    .map((row) => ({
-      date: String(row[props.config.dateColumn] ?? ''),
-      title: String(row[props.config.titleColumn] ?? ''),
-      description: props.config.descriptionColumn ? String(row[props.config.descriptionColumn] ?? '') : '',
-      category: props.config.categoryColumn ? String(row[props.config.categoryColumn] ?? '') : '',
-      _sortDate: new Date(String(row[props.config.dateColumn] ?? '')).getTime(),
-    }))
+    .map((row) => {
+      const dateStr = String(row[props.config.dateColumn] ?? '');
+      const dateObj = new Date(dateStr);
+      const sortDate = isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
+
+      return {
+        date: dateStr,
+        title: String(row[props.config.titleColumn] ?? ''),
+        description: props.config.descriptionColumn ? String(row[props.config.descriptionColumn] ?? '') : '',
+        category: props.config.categoryColumn ? String(row[props.config.categoryColumn] ?? '') : '',
+        _sortDate: sortDate,
+      };
+    })
     .filter((e) => e.title && e.date)
     .sort((a, b) => a._sortDate - b._sortDate);
 });
 
-watch(() => [props.datasetId, props.config?.dateColumn, props.config?.titleColumn], () => loadData(), { immediate: true });
+// Watch only specific stable values, not nested properties
+watch(
+  () => ({
+    datasetId: props.datasetId,
+    dateColumn: props.config?.dateColumn,
+    titleColumn: props.config?.titleColumn,
+  }),
+  () => loadData(),
+  { immediate: true },
+);
 
 async function loadData() {
   if (!props.datasetId || !props.config?.dateColumn || !props.config?.titleColumn) return;
   loading.value = true;
+  error.value = null;
   try {
     const res = await $api<any>('/data/query', {
       method: 'POST',
@@ -79,6 +104,7 @@ async function loadData() {
     });
     data.value = res.data.data;
   } catch (e) {
+    error.value = 'Failed to load timeline data';
     console.error('Widget timeline load failed', e);
   } finally {
     loading.value = false;

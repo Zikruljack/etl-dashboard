@@ -25,7 +25,7 @@ const createPageSchema = z.object({
 const saveComponentsSchema = z.object({
   components: z.array(z.object({
     id: z.string().optional(),
-    type: z.enum(['table', 'chart', 'map', 'timeline']),
+    type: z.enum(['table', 'chart', 'map', 'timeline', 'kpi']),
     title: z.string().max(255).optional(),
     layout: z.object({
       x: z.number(),

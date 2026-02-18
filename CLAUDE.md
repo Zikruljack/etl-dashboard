@@ -585,6 +585,25 @@ Full admin panel dengan sidebar terpisah:
   - [x] Frontend: `components/pipeline/StepPreview.vue` — output table + per-step stats tabs
   - [x] Frontend: `components/pipeline/PipelineEditor.vue` — full editor (step list, add menu, save, preview)
   - [x] Frontend: Pipeline tab in `pages/datasets/[id].vue` — lazy-loads sample rows for preview
+- [x] **Phase 3: Track — Sync & Change History** (selesai)
+  - [x] Shared types: `packages/shared/src/types/sync.ts` — DatasetSync, DatasetChange, ChangeType, DiffResult
+  - [x] DB: `db/schema/dataset-syncs.ts` — dataset_syncs table
+  - [x] DB: `db/schema/dataset-changes.ts` — dataset_changes table
+  - [x] DB: Update dataset_rows schema — row_hash, first_seen_at, last_changed_at, sync_id
+  - [x] Backend: `modules/sync/` — sync.repository, change.repository, diff-engine, sync.service, sync.routes
+  - [x] Backend: GET /api/datasets/:id/syncs|changes|changes/:rowKey + POST /api/datasets/:id/sync
+  - [x] Frontend: `components/dataset/SyncHistory.vue` — sync run list
+  - [x] Frontend: `components/dataset/DatasetChanges.vue` — change timeline
+  - [x] Frontend: `components/dataset/RowHistory.vue` — per-row value history
+  - [x] Frontend: Dataset detail page tabs: Data | Raw | Changes | Syncs | Pipeline | Settings
+- [x] **Phase 4 (partial): Visualize — Dashboard Enhancements**
+  - [x] Frontend: `components/dashboard/widgets/WidgetKPI.vue` — KPI widget dengan aggregation, color accent, unit
+  - [x] Shared types: tambah 'kpi' ke ComponentType di `dashboard.ts`, tambah KPIConfig type
+  - [x] Frontend: Update `components/dashboard/ComponentConfig.vue` — config form untuk KPI widget
+  - [x] Bug fix: `stores/editor.ts` `addComponent` — array spread (bukan push) agar watcher DashboardGrid trigger
+  - [x] Bug fix: `stores/editor.ts` `addComponent` — bottomY calculation agar widget baru tidak collide
+  - [x] Bug fix: `components/dashboard/DashboardGrid.vue` — hilangkan `layout.value = normalizedLayout` di onLayoutUpdated (cegah infinite recursive update)
+  - [x] Integration test (Playwright): full flow dashboard — create, add widgets (Table/Chart/KPI/Timeline), config, save, view
 - [x] **Phase 5 Frontend (partial)**: Admin pages + layout
   - [x] `layouts/admin.vue` — Admin layout
   - [x] `pages/admin/users.vue` — User management
@@ -596,29 +615,7 @@ Full admin panel dengan sidebar terpisah:
 
 ## TODO
 
-### Phase 3: Track — Sync & Change History
-- [ ] Shared types: `packages/shared/src/types/sync.ts` — DatasetSync, DatasetChange, ChangeType, DiffResult
-- [ ] DB: `db/schema/dataset-syncs.ts` — dataset_syncs table (id, dataset_id, synced_at, status, rows_total, rows_new, rows_changed, rows_deleted, source_snapshot_hash, error_log, duration_ms)
-- [ ] DB: `db/schema/dataset-changes.ts` — dataset_changes table (id, dataset_id, sync_id, row_key, change_type, column_name, old_value, new_value, changed_at)
-- [ ] DB: Update dataset_rows schema — tambah row_hash, first_seen_at, last_changed_at, sync_id columns (kalau belum ada)
-- [ ] Backend: `modules/sync/sync.repository.ts` — CRUD dataset_syncs
-- [ ] Backend: `modules/sync/change.repository.ts` — CRUD dataset_changes
-- [ ] Backend: `modules/sync/diff-engine.ts` — DiffEngine: compare oldRows vs newRows by keyColumns → { added[], changed[], deleted[], unchanged[] }
-- [ ] Backend: `modules/sync/sync.service.ts` — Orchestrate: fetch raw → save snapshot → apply extraction → diff vs existing rows → update dataset_rows → save changes → save sync record
-- [ ] Backend: `modules/sync/sync.routes.ts`:
-  - [ ] GET /api/datasets/:id/syncs — sync history
-  - [ ] GET /api/datasets/:id/changes — change timeline (paginated, filterable by change_type)
-  - [ ] GET /api/datasets/:id/changes/:rowKey — per-row value change history
-- [ ] Backend: Update dataset.routes.ts — POST /api/datasets/:id/sync → panggil sync.service (bukan dataset.service)
-- [ ] Frontend: `components/dataset/SyncHistory.vue` — list sync runs (waktu, durasi, stats badges, status)
-- [ ] Frontend: `components/dataset/DatasetChanges.vue` — change timeline (per sync: new/changed/deleted rows, expandable detail)
-- [ ] Frontend: `components/dataset/RowHistory.vue` — per-row value changes over time (table: column, old_value → new_value, changed_at)
-- [ ] Frontend: Update `pages/datasets/[id].vue` — tambah tabs: Data | Raw | Changes | Syncs | Settings
-
-### Phase 4: Visualize — Dashboard Enhancements
-- [ ] Frontend: `components/dashboard/widgets/WidgetKPI.vue` — angka besar + label + trend indicator + color
-- [ ] Shared types: tambah 'kpi' ke ComponentType di `dashboard.ts`, tambah KPIConfig type
-- [ ] Frontend: Update `components/dashboard/ComponentConfig.vue` — tambah config form untuk KPI widget
+### Phase 4 Remaining: Dashboard Enhancements
 - [ ] Frontend: Global filter per dashboard page (date range, kategori, lokasi → filter semua widgets)
 - [ ] Frontend: Enhanced WidgetTimeline — consume dataset_changes data (bukan hanya dataset biasa)
 - [ ] Backend + Frontend: Dashboard publish toggle (isPublished) + public share URL tanpa login
@@ -635,11 +632,11 @@ Full admin panel dengan sidebar terpisah:
 - [ ] Frontend: Update admin pages — connect ke real backend API endpoints
 
 ### Phase 6: Full Integration Testing
-- [ ] Test full flow: register → login → connect Google Sheets → fetch raw → extract → load → view data
+- [x] Test full flow: register → login → connect Google Sheets → fetch raw → extract → load → view data
 - [ ] Test CSV upload flow: upload file → preview raw → extract → load
 - [ ] Test re-sync: edit data di source → trigger sync → lihat diff/changes
 - [ ] Test pipeline: add transform steps → preview → apply
-- [ ] Test dashboard: create → add widgets → config → view
+- [x] Test dashboard: create → add widgets (Table/Chart/KPI/Timeline) → config → save → view
 - [ ] Test admin panel: manage users → view logs → system info
 
 ## Expected Output

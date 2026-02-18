@@ -50,17 +50,25 @@ export const useEditorStore = defineStore('editor', {
         chart: { chartType: 'bar', xAxis: '', yAxis: '' },
         map: { latitudeColumn: '', longitudeColumn: '' },
         timeline: { dateColumn: '', titleColumn: '' },
+        kpi: { valueColumn: '', aggregation: 'sum' },
       };
 
-      this.components.push({
-        id,
-        type,
-        title: `New ${type}`,
-        layout: { x: 0, y: 0, w: 6, h: 4 },
-        config: defaultConfigs[type],
-        datasetId: null,
-        i: id,
-      });
+      // Place new widget below all existing widgets to avoid collisions
+      const bottomY = this.components.reduce((max, c) => Math.max(max, c.layout.y + c.layout.h), 0);
+
+      // Use array replacement (not push) so the watcher in DashboardGrid detects the new reference
+      this.components = [
+        ...this.components,
+        {
+          id,
+          type,
+          title: `New ${type}`,
+          layout: { x: 0, y: bottomY, w: 6, h: 4 },
+          config: defaultConfigs[type],
+          datasetId: null,
+          i: id,
+        },
+      ];
       this.selectedComponentId = id;
       this.isDirty = true;
     },
@@ -74,13 +82,32 @@ export const useEditorStore = defineStore('editor', {
     },
 
     updateLayout(layouts: Array<{ i: string; x: number; y: number; w: number; h: number }>) {
-      layouts.forEach((l) => {
-        const comp = this.components.find((c) => c.i === l.i);
-        if (comp) {
-          comp.layout = { x: l.x, y: l.y, w: l.w, h: l.h };
-        }
-      });
-      this.isDirty = true;
+      let hasChanged = false;
+      const byId = new Map(layouts.map((l) => [l.i, l]));
+
+      // Mutate existing component layout in place so grid items stay stable while dragging/resizing.
+      for (const component of this.components) {
+        const next = byId.get(component.i);
+        if (!next) continue;
+
+        const hasLayoutChanged =
+          component.layout.x !== next.x ||
+          component.layout.y !== next.y ||
+          component.layout.w !== next.w ||
+          component.layout.h !== next.h;
+
+        if (!hasLayoutChanged) continue;
+
+        component.layout = {
+          x: next.x,
+          y: next.y,
+          w: next.w,
+          h: next.h,
+        };
+        hasChanged = true;
+      }
+
+      if (hasChanged) this.isDirty = true;
     },
 
     updateComponent(id: string, updates: Partial<EditorComponent>) {

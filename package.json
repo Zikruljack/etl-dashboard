@@ -12,7 +12,10 @@
     "db:generate": "pnpm --filter @etl-dashboard/server db:generate",
     "db:migrate": "pnpm --filter @etl-dashboard/server db:migrate",
     "db:push": "pnpm --filter @etl-dashboard/server db:push",
-    "db:studio": "pnpm --filter @etl-dashboard/server db:studio"
+    "db:studio": "pnpm --filter @etl-dashboard/server db:studio",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:headed": "playwright test -c e2e/playwright.config.ts --headed",
+    "test:e2e:ui": "playwright test -c e2e/playwright.config.ts --ui"
   },
   "engines": {
     "node": ">=20"
@@ -25,6 +28,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "concurrently": "^9.2.1"
   }
 }

@@ -143,7 +143,7 @@ export async function deletePage(pageId: string): Promise<void> {
 export async function saveComponents(
   pageId: string,
   components: Array<{
-    type: 'table' | 'chart' | 'map' | 'timeline';
+    type: 'table' | 'chart' | 'map' | 'timeline' | 'kpi';
     title?: string;
     layout: { x: number; y: number; w: number; h: number };
     config: Record<string, unknown>;

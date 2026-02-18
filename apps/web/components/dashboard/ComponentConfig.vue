@@ -37,7 +37,7 @@
             <label v-for="col in availableColumns" :key="col" class="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                :checked="(component.config as any).columns?.includes(col)"
+                :checked="!!(component.config as any)?.columns?.includes(col)"
                 @change="toggleColumn(col)"
                 class="rounded"
               />
@@ -51,7 +51,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Chart Type</label>
           <select
-            :value="(component.config as any).chartType || 'bar'"
+            :value="(component.config as any)?.chartType || 'bar'"
             @change="updateConfig('chartType', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -63,7 +63,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">X Axis</label>
           <select
-            :value="(component.config as any).xAxis || ''"
+            :value="(component.config as any)?.xAxis || ''"
             @change="updateConfig('xAxis', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -74,7 +74,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Y Axis</label>
           <select
-            :value="(component.config as any).yAxis || ''"
+            :value="(component.config as any)?.yAxis || ''"
             @change="updateConfig('yAxis', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -88,7 +88,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Latitude Column</label>
           <select
-            :value="(component.config as any).latitudeColumn || ''"
+            :value="(component.config as any)?.latitudeColumn || ''"
             @change="updateConfig('latitudeColumn', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -99,7 +99,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Longitude Column</label>
           <select
-            :value="(component.config as any).longitudeColumn || ''"
+            :value="(component.config as any)?.longitudeColumn || ''"
             @change="updateConfig('longitudeColumn', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -110,7 +110,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Label Column</label>
           <select
-            :value="(component.config as any).labelColumn || ''"
+            :value="(component.config as any)?.labelColumn || ''"
             @change="updateConfig('labelColumn', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -124,7 +124,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Date Column</label>
           <select
-            :value="(component.config as any).dateColumn || ''"
+            :value="(component.config as any)?.dateColumn || ''"
             @change="updateConfig('dateColumn', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -135,7 +135,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Title Column</label>
           <select
-            :value="(component.config as any).titleColumn || ''"
+            :value="(component.config as any)?.titleColumn || ''"
             @change="updateConfig('titleColumn', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -146,8 +146,19 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Description Column</label>
           <select
-            :value="(component.config as any).descriptionColumn || ''"
+            :value="(component.config as any)?.descriptionColumn || ''"
             @change="updateConfig('descriptionColumn', ($event.target as HTMLSelectElement).value)"
+            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+          >
+            <option value="">None</option>
+            <option v-for="col in availableColumns" :key="col" :value="col">{{ col }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Category Column</label>
+          <select
+            :value="(component.config as any)?.categoryColumn || ''"
+            @change="updateConfig('categoryColumn', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
             <option value="">None</option>
@@ -161,7 +172,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Value Column</label>
           <select
-            :value="(component.config as any).valueColumn || ''"
+            :value="(component.config as any)?.valueColumn || ''"
             @change="updateConfig('valueColumn', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -172,7 +183,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Aggregation</label>
           <select
-            :value="(component.config as any).aggregation || 'sum'"
+            :value="(component.config as any)?.aggregation || 'sum'"
             @change="updateConfig('aggregation', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -186,7 +197,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Unit (optional)</label>
           <input
-            :value="(component.config as any).unit || ''"
+            :value="(component.config as any)?.unit || ''"
             @input="updateConfig('unit', ($event.target as HTMLInputElement).value)"
             placeholder="e.g. jiwa, %, km"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
@@ -198,7 +209,7 @@
             type="number"
             min="0"
             max="4"
-            :value="(component.config as any).decimals ?? 0"
+            :value="(component.config as any)?.decimals ?? 0"
             @input="updateConfig('decimals', Number(($event.target as HTMLInputElement).value))"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           />
@@ -206,7 +217,7 @@
         <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">Accent Color</label>
           <select
-            :value="(component.config as any).color || 'blue'"
+            :value="(component.config as any)?.color || 'blue'"
             @change="updateConfig('color', ($event.target as HTMLSelectElement).value)"
             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
           >
@@ -240,8 +251,14 @@ const availableColumns = ref<string[]>([]);
 
 onMounted(async () => {
   try {
-    const res = await $api<{ success: boolean; data: any[] }>('/datasets');
-    datasets.value = res.data;
+    const res = await $api<{ success: boolean; data: any[] | { data: any[]; total: number } }>('/datasets');
+    // Handle both paginated and non-paginated responses
+    if (Array.isArray(res.data)) {
+      datasets.value = res.data;
+    } else if (res.data && typeof res.data === 'object' && 'data' in res.data) {
+      // Paginated response: { data: [...], total: N }
+      datasets.value = (res.data as any).data;
+    }
   } catch (e) {
     console.error('Failed to load datasets', e);
   }
@@ -265,7 +282,8 @@ function update(key: string, value: any) {
 }
 
 function updateConfig(key: string, value: any) {
-  emit('update', { config: { ...props.component.config, [key]: value } });
+  const currentConfig = props.component.config || {};
+  emit('update', { config: { ...currentConfig, [key]: value } });
 }
 
 async function onDatasetChange(datasetId: string) {
@@ -278,7 +296,7 @@ async function onDatasetChange(datasetId: string) {
 }
 
 function toggleColumn(col: string) {
-  const current = (props.component.config as any).columns || [];
+  const current = (props.component.config as any)?.columns || [];
   const newCols = current.includes(col)
     ? current.filter((c: string) => c !== col)
     : [...current, col];
