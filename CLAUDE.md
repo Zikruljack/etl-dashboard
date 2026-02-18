@@ -596,7 +596,7 @@ Full admin panel dengan sidebar terpisah:
   - [x] Frontend: `components/dataset/DatasetChanges.vue` — change timeline
   - [x] Frontend: `components/dataset/RowHistory.vue` — per-row value history
   - [x] Frontend: Dataset detail page tabs: Data | Raw | Changes | Syncs | Pipeline | Settings
-- [x] **Phase 4 (partial): Visualize — Dashboard Enhancements**
+- [x] **Phase 4: Visualize — Dashboard Enhancements** (selesai)
   - [x] Frontend: `components/dashboard/widgets/WidgetKPI.vue` — KPI widget dengan aggregation, color accent, unit
   - [x] Shared types: tambah 'kpi' ke ComponentType di `dashboard.ts`, tambah KPIConfig type
   - [x] Frontend: Update `components/dashboard/ComponentConfig.vue` — config form untuk KPI widget
@@ -604,32 +604,38 @@ Full admin panel dengan sidebar terpisah:
   - [x] Bug fix: `stores/editor.ts` `addComponent` — bottomY calculation agar widget baru tidak collide
   - [x] Bug fix: `components/dashboard/DashboardGrid.vue` — hilangkan `layout.value = normalizedLayout` di onLayoutUpdated (cegah infinite recursive update)
   - [x] Integration test (Playwright): full flow dashboard — create, add widgets (Table/Chart/KPI/Timeline), config, save, view
-- [x] **Phase 5 Frontend (partial)**: Admin pages + layout
+  - [x] Frontend: `WidgetTimeline.vue` dirombak dari event-card list ke ECharts multi-series line chart (smooth lines, area fill, DataZoom untuk data besar)
+  - [x] Shared types: `TimelineConfig` diupdate — `titleColumn/descriptionColumn/categoryColumn` → `valueColumns: string[]` (multi-series)
+  - [x] Frontend: `ComponentConfig.vue` — timeline config form diupdate: dateColumn selector + valueColumns multi-checkbox
+  - [x] Frontend: `WidgetTimeline.vue` — change-history mode: stacked bar chart (added/changed/deleted per time period) dari `/datasets/:id/changes` API; toggle + groupBy (day/week/month) di ComponentConfig
+  - [x] Shared types: `TimelineConfig` — tambah `useChangeHistory?: boolean` + `changeGroupBy?: 'day' | 'week' | 'month'`
+  - [x] Frontend: `components/dashboard/GlobalFilter.vue` — date range + extra text filter fields, v-model DashboardFilter
+  - [x] Frontend: `composables/useWidgetFilter.ts` — converts DashboardFilter → API filter array, maps date range to dateColumn/xAxis
+  - [x] Frontend: `DashboardGrid.vue` + `ComponentWrapper.vue` — propagate globalFilter prop ke semua widget
+  - [x] Frontend: WidgetTable, WidgetChart, WidgetTimeline, WidgetKPI — semua menerima globalFilter, pass ke API filters
+  - [x] Frontend: `pages/dashboard/[id]/index.vue` — GlobalFilter bar + pass ke DashboardGrid
+  - [x] Backend: `modules/public/public.routes.ts` — GET /api/public/dashboard/:id (no auth, published only)
+  - [x] Frontend: `pages/public/dashboard/[id].vue` — public dashboard view (layout: false, no auth required)
+  - [x] Frontend: "Public Link" button di dashboard view page saat isPublished = true
+- [x] **Phase 5: Admin Backend + Activity Logging** (selesai)
+  - [x] DB: `db/schema/activity-logs.ts` — activity_logs table (id, userId, action, resourceType, resourceId, details JSONB, createdAt)
+  - [x] DB: `db/schema/app-settings.ts` — app_settings key-value table (key PK varchar, value text, description, updatedAt)
+  - [x] Backend: `modules/admin/activity-log.repository.ts` — findPaginatedWithUser() dengan LEFT JOIN users, filter user/action/resourceType/date
+  - [x] Backend: `modules/admin/activity-log.service.ts` — logActivity() fire-and-forget, queryLogs(), getLogActions()
+  - [x] Backend: `modules/admin/settings.repository.ts` — key-value store, seedDefaults() idempotent, getAll/get/set/setMany
+  - [x] Backend: `modules/admin/settings.service.ts` — getSettings() redacts sensitive keys as '***', updateSettings() skips '***' values
+  - [x] Backend: `modules/admin/admin.routes.ts` — GET /logs, GET /logs/actions, GET /system (Node/memory/DB stats), GET/PATCH /settings
+  - [x] Backend: `core/middleware/activity-logger.ts` — ACTION_MAP 14 entries, res.on('finish') pattern, dynamic import avoid circular dep
+  - [x] Backend: `apps/server/src/index.ts` — mount adminRoutes + publicRoutes + activityLogger, seedDefaults on startup
+  - [x] Frontend: `pages/admin/logs.vue` — real API, pagination, resourceType/date filters, color-coded action badges
+  - [x] Frontend: `pages/admin/system.vue` — real API, Node version/uptime/memory/CPUs + DB table counts
+  - [x] Frontend: `pages/admin/settings.vue` — load/save via API, handles '***' for sensitive keys, allowRegistration toggle
   - [x] `layouts/admin.vue` — Admin layout
   - [x] `pages/admin/users.vue` — User management
   - [x] `pages/admin/datasets.vue` — Dataset management
-  - [x] `pages/admin/dashboard.vue` — Dashboard management
-  - [x] `pages/admin/settings.vue` — Settings page (UI only, no backend persistence)
-  - [x] `pages/admin/logs.vue` — Activity logs page (UI only, no backend API)
-  - [x] `pages/admin/system.vue` — System info page (UI only, no backend API)
+  - [x] `pages/admin/dashboard.vue` — Dashboard management (publish/unpublish via PATCH)
 
 ## TODO
-
-### Phase 4 Remaining: Dashboard Enhancements
-- [ ] Frontend: Global filter per dashboard page (date range, kategori, lokasi → filter semua widgets)
-- [ ] Frontend: Enhanced WidgetTimeline — consume dataset_changes data (bukan hanya dataset biasa)
-- [ ] Backend + Frontend: Dashboard publish toggle (isPublished) + public share URL tanpa login
-
-### Phase 5 Remaining: Admin Backend + Activity Logging
-- [ ] DB: `db/schema/activity-logs.ts` — activity_logs table (id, user_id, action, resource_type, resource_id, details JSONB, created_at)
-- [ ] Backend: `modules/admin/activity-log.repository.ts` — CRUD + paginated query
-- [ ] Backend: `modules/admin/activity-log.service.ts` — log activity, query logs
-- [ ] Backend: `core/middleware/activity-logger.ts` — auto-log middleware (create/update/delete actions)
-- [ ] Backend: `modules/admin/admin.routes.ts`:
-  - [ ] GET /api/admin/logs — activity logs (paginated, filterable by user, action, resource)
-  - [ ] GET /api/admin/system — system info (DB stats, server version, uptime, memory)
-- [ ] Backend: Settings persistence — simpan Google API credentials / app settings ke DB
-- [ ] Frontend: Update admin pages — connect ke real backend API endpoints
 
 ### Phase 6: Full Integration Testing
 - [x] Test full flow: register → login → connect Google Sheets → fetch raw → extract → load → view data

@@ -32,11 +32,13 @@
         v-if="component?.type === 'table'"
         :config="component.config"
         :dataset-id="component.datasetId"
+        :global-filter="globalFilter"
       />
       <WidgetChart
         v-else-if="component?.type === 'chart'"
         :config="component.config"
         :dataset-id="component.datasetId"
+        :global-filter="globalFilter"
       />
       <WidgetMap
         v-else-if="component?.type === 'map'"
@@ -47,11 +49,13 @@
         v-else-if="component?.type === 'timeline'"
         :config="component.config"
         :dataset-id="component.datasetId"
+        :global-filter="globalFilter"
       />
       <WidgetKPI
         v-else-if="component?.type === 'kpi'"
         :config="component.config"
         :dataset-id="component.datasetId"
+        :global-filter="globalFilter"
       />
       <div v-else class="flex items-center justify-center h-full text-gray-400 text-sm">
         Configure this widget
@@ -61,9 +65,12 @@
 </template>
 
 <script setup lang="ts">
+import type { DashboardFilter } from '~/components/dashboard/GlobalFilter.vue';
+
 const props = defineProps<{
   component: any;
   editable: boolean;
+  globalFilter?: DashboardFilter | null;
 }>();
 
 defineEmits<{

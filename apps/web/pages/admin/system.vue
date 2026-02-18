@@ -2,119 +2,120 @@
   <div>
     <PageHeader title="System Info" description="Server status, database stats, and application info">
       <template #actions>
-        <button
-          @click="refresh"
-          class="btn-primary"
-        >
-          Refresh
+        <button @click="refresh" :disabled="loading" class="btn-primary">
+          {{ loading ? 'Loading...' : 'Refresh' }}
         </button>
       </template>
     </PageHeader>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Server Status</p>
-        <div class="flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-full animate-pulse" :class="serverOnline ? 'bg-green-500' : 'bg-red-500'"></span>
-          <span class="text-lg font-semibold">{{ serverOnline ? 'Online' : 'Offline' }}</span>
-        </div>
-      </div>
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Users</p>
-        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.users }}</p>
-      </div>
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Datasets</p>
-        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.datasets }}</p>
-      </div>
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Dashboards</p>
-        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.dashboards }}</p>
-      </div>
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Data Rows</p>
-        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.dataRows }}</p>
-      </div>
-      <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">App Version</p>
-        <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">0.1.0</p>
-      </div>
-    </div>
+    <LoadingState v-if="loading && !sysInfo" message="Loading system info..." />
 
-    <!-- Server Info -->
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-      <h2 class="text-lg font-semibold dark:text-gray-100 mb-4">Server Details</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <span class="text-gray-500 dark:text-gray-400">API Base</span>
-          <span class="font-mono text-gray-700 dark:text-gray-300 text-xs">{{ apiBase }}</span>
-        </div>
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <span class="text-gray-500 dark:text-gray-400">Server Time</span>
-          <span class="font-mono text-gray-700 dark:text-gray-300 text-xs">{{ serverTime }}</span>
-        </div>
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <span class="text-gray-500 dark:text-gray-400">Database</span>
-          <span class="font-mono text-gray-700 dark:text-gray-300 text-xs">PostgreSQL</span>
-        </div>
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <span class="text-gray-500 dark:text-gray-400">Backend</span>
-          <span class="font-mono text-gray-700 dark:text-gray-300 text-xs">Express + TypeScript</span>
-        </div>
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <span class="text-gray-500 dark:text-gray-400">Frontend</span>
-          <span class="font-mono text-gray-700 dark:text-gray-300 text-xs">Nuxt 3</span>
-        </div>
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <span class="text-gray-500 dark:text-gray-400">ORM</span>
-          <span class="font-mono text-gray-700 dark:text-gray-300 text-xs">Drizzle</span>
+    <template v-else-if="sysInfo">
+      <!-- Top stat cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        <div
+          v-for="(label, key) in topStats"
+          :key="key"
+          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4"
+        >
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ label }}</p>
+          <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {{ sysInfo.database.tableCounts[key] ?? '—' }}
+          </p>
         </div>
       </div>
-    </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Server details -->
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 class="text-base font-semibold dark:text-gray-100 mb-4">Server</h2>
+          <div class="space-y-2 text-sm">
+            <div v-for="row in serverRows" :key="row.label" class="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <span class="text-gray-500 dark:text-gray-400">{{ row.label }}</span>
+              <span class="font-mono text-gray-700 dark:text-gray-300 text-xs">{{ row.value }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DB table counts -->
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 class="text-base font-semibold dark:text-gray-100 mb-4">Database Tables</h2>
+          <div class="space-y-1.5">
+            <div
+              v-for="(count, table) in sysInfo.database.tableCounts"
+              :key="table"
+              class="flex items-center justify-between text-sm"
+            >
+              <span class="font-mono text-gray-500 dark:text-gray-400 text-xs">{{ table }}</span>
+              <span class="font-semibold text-gray-900 dark:text-gray-100">{{ count.toLocaleString() }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ middleware: 'auth', layout: 'admin' });
 
-const config = useRuntimeConfig();
 const { $api } = useApi();
 
-const apiBase = config.public.apiBase;
-const serverOnline = ref(false);
-const serverTime = ref('');
-const stats = reactive({
-  users: 0,
-  datasets: 0,
-  dashboards: 0,
-  dataRows: 0,
+interface SysInfo {
+  server: {
+    nodeVersion: string;
+    platform: string;
+    arch: string;
+    uptimeSeconds: number;
+    memory: { heapUsedMb: number; heapTotalMb: number; rssMb: number };
+    cpus: number;
+    hostname: string;
+  };
+  database: { tableCounts: Record<string, number> };
+  app: { version: string; env: string };
+}
+
+const sysInfo = ref<SysInfo | null>(null);
+const loading = ref(false);
+
+const topStats: Record<string, string> = {
+  users: 'Users',
+  datasets: 'Datasets',
+  dashboards: 'Dashboards',
+  dataset_rows: 'Data Rows',
+  activity_logs: 'Log Entries',
+};
+
+const serverRows = computed(() => {
+  if (!sysInfo.value) return [];
+  const s = sysInfo.value.server;
+  const uptimeH = Math.floor(s.uptimeSeconds / 3600);
+  const uptimeM = Math.floor((s.uptimeSeconds % 3600) / 60);
+  return [
+    { label: 'Status', value: '● Online' },
+    { label: 'Node.js', value: s.nodeVersion },
+    { label: 'Platform', value: `${s.platform} (${s.arch})` },
+    { label: 'Hostname', value: s.hostname },
+    { label: 'CPUs', value: String(s.cpus) },
+    { label: 'Uptime', value: `${uptimeH}h ${uptimeM}m` },
+    { label: 'Heap Used', value: `${s.memory.heapUsedMb} MB / ${s.memory.heapTotalMb} MB` },
+    { label: 'RSS', value: `${s.memory.rssMb} MB` },
+    { label: 'App Version', value: sysInfo.value.app.version },
+    { label: 'Environment', value: sysInfo.value.app.env },
+  ];
 });
 
 onMounted(() => refresh());
 
 async function refresh() {
-  // Check server health
+  loading.value = true;
   try {
-    const health = await $api<{ status: string; timestamp: string }>('/health');
-    serverOnline.value = health.status === 'ok';
-    serverTime.value = new Date(health.timestamp).toLocaleString();
-  } catch {
-    serverOnline.value = false;
-    serverTime.value = 'N/A';
-  }
-
-  // Get stats
-  try {
-    const [usersRes, datasetsRes, dashboardRes] = await Promise.all([
-      $api<{ success: boolean; data: any[] }>('/users'),
-      $api<{ success: boolean; data: any[] }>('/datasets'),
-      $api<{ success: boolean; data: any[] }>('/dashboard'),
-    ]);
-    stats.users = usersRes.data.length;
-    stats.datasets = datasetsRes.data.length;
-    stats.dashboards = dashboardRes.data.length;
+    const res = await $api<{ success: boolean; data: SysInfo }>('/admin/system');
+    sysInfo.value = res.data;
   } catch (e) {
-    console.error('Failed to load stats', e);
+    console.error('Failed to load system info', e);
+  } finally {
+    loading.value = false;
   }
 }
 </script>

@@ -41,12 +41,16 @@
 </template>
 
 <script setup lang="ts">
+import type { DashboardFilter } from '~/components/dashboard/GlobalFilter.vue';
+
 const props = defineProps<{
   config: any;
   datasetId: string | null;
+  globalFilter?: DashboardFilter | null;
 }>();
 
 const { $api } = useApi();
+const apiFilters = useWidgetFilter(computed(() => props.config), computed(() => props.globalFilter));
 
 const data = ref<Record<string, unknown>[]>([]);
 const loading = ref(false);
@@ -81,7 +85,11 @@ function toggleSort(col: string) {
   }
 }
 
-watch(() => props.datasetId, () => { page.value = 1; loadData(); }, { immediate: true });
+watch(
+  () => [props.datasetId, apiFilters.value],
+  () => { page.value = 1; loadData(); },
+  { immediate: true },
+);
 
 async function loadData() {
   if (!props.datasetId) return;
@@ -92,6 +100,7 @@ async function loadData() {
       body: {
         datasetId: props.datasetId,
         columns: props.config?.columns?.length > 0 ? props.config.columns : undefined,
+        filters: apiFilters.value.length > 0 ? apiFilters.value : undefined,
         limit: pageSize.value,
         offset: (page.value - 1) * pageSize.value,
       },

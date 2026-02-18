@@ -59,23 +59,27 @@ onMounted(async () => {
   echartsReady.value = true;
 });
 
+import type { DashboardFilter } from '~/components/dashboard/GlobalFilter.vue';
+
 const props = defineProps<{
   config: any;
   datasetId: string | null;
+  globalFilter?: DashboardFilter | null;
 }>();
 
 const { $api } = useApi();
+const apiFilters = useWidgetFilter(computed(() => props.config), computed(() => props.globalFilter));
 
 const data = ref<Record<string, unknown>[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-// Watch only specific stable values, not nested properties
 watch(
   () => ({
     datasetId: props.datasetId,
     xAxis: props.config?.xAxis,
     yAxis: props.config?.yAxis,
+    apiFilters: apiFilters.value,
   }),
   () => loadData(),
   { immediate: true },
@@ -91,6 +95,7 @@ async function loadData() {
       body: {
         datasetId: props.datasetId,
         columns: [props.config.xAxis, props.config.yAxis],
+        filters: apiFilters.value.length > 0 ? apiFilters.value : undefined,
         limit: 1000,
       },
     });

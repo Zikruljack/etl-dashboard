@@ -32,11 +32,26 @@ export interface MapConfig {
   zoom?: number;
 }
 
+/**
+ * Configuration for a Timeline widget — a time-series chart using ECharts.
+ *
+ * Two modes:
+ * - Dataset rows mode (default): smooth line chart; dateColumn on X, valueColumns as Y series.
+ * - Change-history mode (useChangeHistory = true): stacked bar chart showing rows
+ *   added / changed / deleted per time period from /datasets/:id/changes API.
+ */
 export interface TimelineConfig {
+  /** Column whose values are used as the X axis (dataset rows mode). */
   dateColumn: string;
-  titleColumn: string;
-  descriptionColumn?: string;
-  categoryColumn?: string;
+  /** Columns to plot as Y axis series — each becomes one line (dataset rows mode). */
+  valueColumns: string[];
+  /**
+   * When true, visualise change history from the /changes API instead of dataset rows.
+   * Shows a stacked bar chart of added/changed/deleted row counts per time period.
+   */
+  useChangeHistory?: boolean;
+  /** How to group change timestamps: 'day' | 'week' | 'month'. Default: 'day'. */
+  changeGroupBy?: 'day' | 'week' | 'month';
 }
 
 /** Trend direction for KPI widgets. */

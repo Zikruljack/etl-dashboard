@@ -16,6 +16,14 @@
           <StatusBadge v-if="dashboard.isPublished" status="published" label="Published" />
         </template>
         <template #actions>
+          <a
+            v-if="dashboard.isPublished"
+            :href="`/public/dashboard/${dashboard.id}`"
+            target="_blank"
+            class="btn-secondary text-sm"
+          >
+            Public Link
+          </a>
           <NuxtLink
             v-if="authStore.isEditor"
             :to="`/dashboard/${dashboard.id}/edit`"
@@ -41,11 +49,15 @@
         </button>
       </div>
 
+      <!-- Global filter bar -->
+      <GlobalFilter v-model="globalFilter" />
+
       <!-- Dashboard grid (view mode) -->
       <DashboardGrid
         v-if="currentPage"
         :components="currentPage.components"
         :editable="false"
+        :global-filter="globalFilter"
       />
     </div>
   </div>
@@ -53,6 +65,7 @@
 
 <script setup lang="ts">
 import type { ApiResponse, Dashboard } from '@etl-dashboard/shared';
+import type { DashboardFilter } from '~/components/dashboard/GlobalFilter.vue';
 
 definePageMeta({ middleware: 'auth' });
 
@@ -61,6 +74,7 @@ const authStore = useAuthStore();
 const { $api } = useApi();
 
 const activePage = ref('');
+const globalFilter = ref<DashboardFilter>({ dateFrom: '', dateTo: '', extra: {} });
 
 const { loading, data: dashboard } = useLoading(
   async () => {

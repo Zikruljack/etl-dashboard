@@ -31,6 +31,7 @@
         <ComponentWrapper
           :component="getComponent(item.i)"
           :editable="editable"
+          :global-filter="globalFilter"
           @select="$emit('select', item.i)"
           @remove="$emit('remove', item.i)"
         />
@@ -40,9 +41,13 @@
 </template>
 
 <script setup lang="ts">
+import type { DashboardFilter } from '~/components/dashboard/GlobalFilter.vue';
+
 const props = defineProps<{
   components: any[];
   editable: boolean;
+  /** Optional global filter — passed down to each widget */
+  globalFilter?: DashboardFilter | null;
 }>();
 
 const emit = defineEmits<{
@@ -70,10 +75,10 @@ watch(
         w: c.layout.w,
         h: c.layout.h,
       }));
-    
+
     // Create a key to detect actual changes
     const newKey = newLayout.map((l) => `${l.i}:${l.x}:${l.y}:${l.w}:${l.h}`).join('|');
-    
+
     // Only update if layout actually changed
     if (newKey !== previousLayoutKey) {
       previousLayoutKey = newKey;

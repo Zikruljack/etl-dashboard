@@ -41,13 +41,16 @@
 
 <script setup lang="ts">
 import type { KPIConfig } from '@etl-dashboard/shared';
+import type { DashboardFilter } from '~/components/dashboard/GlobalFilter.vue';
 
 const props = defineProps<{
   config: KPIConfig | null;
   datasetId: string | null;
+  globalFilter?: DashboardFilter | null;
 }>();
 
 const { $api } = useApi();
+const apiFilters = useWidgetFilter(computed(() => props.config), computed(() => props.globalFilter));
 
 const rawValue = ref<number | null>(null);
 const loading = ref(false);
@@ -101,6 +104,7 @@ async function loadData() {
       body: {
         datasetId: props.datasetId,
         columns: [props.config.valueColumn],
+        filters: apiFilters.value.length > 0 ? apiFilters.value : undefined,
         limit: 5000,
         offset: 0,
       },
@@ -146,12 +150,12 @@ async function loadData() {
   }
 }
 
-// Watch only specific stable values, not nested properties
 watch(
   () => ({
     datasetId: props.datasetId,
     valueColumn: props.config?.valueColumn,
     aggregation: props.config?.aggregation,
+    apiFilters: apiFilters.value,
   }),
   loadData,
   { immediate: true },

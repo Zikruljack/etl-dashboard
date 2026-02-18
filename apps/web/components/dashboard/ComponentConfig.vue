@@ -121,50 +121,80 @@
       </template>
 
       <template v-else-if="component.type === 'timeline'">
+        <!-- Data source mode toggle -->
         <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Date Column</label>
-          <select
-            :value="(component.config as any)?.dateColumn || ''"
-            @change="updateConfig('dateColumn', ($event.target as HTMLSelectElement).value)"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Select column</option>
-            <option v-for="col in availableColumns" :key="col" :value="col">{{ col }}</option>
-          </select>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Data Source</label>
+          <div class="flex gap-1">
+            <button
+              @click="updateConfig('useChangeHistory', false)"
+              class="flex-1 py-1 text-xs border rounded transition-colors"
+              :class="!(component.config as any)?.useChangeHistory
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'"
+            >
+              Dataset rows
+            </button>
+            <button
+              @click="updateConfig('useChangeHistory', true)"
+              class="flex-1 py-1 text-xs border rounded transition-colors"
+              :class="(component.config as any)?.useChangeHistory
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'"
+            >
+              Change history
+            </button>
+          </div>
+          <p v-if="(component.config as any)?.useChangeHistory" class="text-xs text-gray-400 mt-1">
+            Shows rows added / changed / deleted per time period from sync history.
+          </p>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Title Column</label>
-          <select
-            :value="(component.config as any)?.titleColumn || ''"
-            @change="updateConfig('titleColumn', ($event.target as HTMLSelectElement).value)"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Select column</option>
-            <option v-for="col in availableColumns" :key="col" :value="col">{{ col }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Description Column</label>
-          <select
-            :value="(component.config as any)?.descriptionColumn || ''"
-            @change="updateConfig('descriptionColumn', ($event.target as HTMLSelectElement).value)"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
-          >
-            <option value="">None</option>
-            <option v-for="col in availableColumns" :key="col" :value="col">{{ col }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Category Column</label>
-          <select
-            :value="(component.config as any)?.categoryColumn || ''"
-            @change="updateConfig('categoryColumn', ($event.target as HTMLSelectElement).value)"
-            class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
-          >
-            <option value="">None</option>
-            <option v-for="col in availableColumns" :key="col" :value="col">{{ col }}</option>
-          </select>
-        </div>
+
+        <!-- Change-history mode: groupBy only -->
+        <template v-if="(component.config as any)?.useChangeHistory">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Group By</label>
+            <select
+              :value="(component.config as any)?.changeGroupBy || 'day'"
+              @change="updateConfig('changeGroupBy', ($event.target as HTMLSelectElement).value)"
+              class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+            >
+              <option value="day">Day</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+            </select>
+          </div>
+        </template>
+
+        <!-- Dataset rows mode: dateColumn + valueColumns -->
+        <template v-else>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Date Column (X Axis)</label>
+            <select
+              :value="(component.config as any)?.dateColumn || ''"
+              @change="updateConfig('dateColumn', ($event.target as HTMLSelectElement).value)"
+              class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+            >
+              <option value="">Select column</option>
+              <option v-for="col in availableColumns" :key="col" :value="col">{{ col }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Value Columns (Y Axis)</label>
+            <p class="text-xs text-gray-400 mb-1">Each selected column becomes one line series.</p>
+            <div class="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded p-2">
+              <label v-for="col in availableColumns" :key="col" class="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  :checked="!!((component.config as any)?.valueColumns || []).includes(col)"
+                  @change="toggleValueColumn(col)"
+                  class="rounded"
+                />
+                {{ col }}
+              </label>
+              <p v-if="!availableColumns.length" class="text-xs text-gray-400 py-1">Select a dataset first</p>
+            </div>
+          </div>
+        </template>
       </template>
 
       <!-- KPI config -->
@@ -301,5 +331,13 @@ function toggleColumn(col: string) {
     ? current.filter((c: string) => c !== col)
     : [...current, col];
   updateConfig('columns', newCols);
+}
+
+function toggleValueColumn(col: string) {
+  const current = (props.component.config as any)?.valueColumns || [];
+  const next = current.includes(col)
+    ? current.filter((c: string) => c !== col)
+    : [...current, col];
+  updateConfig('valueColumns', next);
 }
 </script>
