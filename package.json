@@ -1,0 +1,30 @@
+{
+  "name": "etl-dashboard",
+  "private": true,
+  "scripts": {
+    "dev:server": "pnpm --filter @etl-dashboard/server dev",
+    "dev:web": "pnpm --filter @etl-dashboard/web dev",
+    "dev": "concurrently -n server,web -c blue,green \"pnpm run dev:server\" \"pnpm run dev:web\"",
+    "build:shared": "pnpm --filter @etl-dashboard/shared build",
+    "build:server": "pnpm --filter @etl-dashboard/server build",
+    "build:web": "pnpm --filter @etl-dashboard/web build",
+    "build": "pnpm build:shared && pnpm build:server && pnpm build:web",
+    "db:generate": "pnpm --filter @etl-dashboard/server db:generate",
+    "db:migrate": "pnpm --filter @etl-dashboard/server db:migrate",
+    "db:push": "pnpm --filter @etl-dashboard/server db:push",
+    "db:studio": "pnpm --filter @etl-dashboard/server db:studio"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild",
+      "vue-demi"
+    ]
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
