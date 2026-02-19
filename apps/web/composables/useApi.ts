@@ -54,7 +54,14 @@ export function useApi() {
       headers['Authorization'] = `Bearer ${authStore.token}`;
     }
 
-    const res = await $fetch<T>(`${config.public.apiBase}${path}`, {
+    // On SSR (server-side render inside Docker), use the internal container URL to avoid
+    // routing requests out of the Docker network and back in through the public interface.
+    const baseUrl =
+      process.server && config.apiBaseInternal
+        ? config.apiBaseInternal
+        : config.public.apiBase;
+
+    const res = await $fetch<T>(`${baseUrl}${path}`, {
       method: options.method,
       body: options.body,
       params: options.params,

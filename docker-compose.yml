@@ -1,0 +1,75 @@
+services:
+
+  # ──────────────────────────────────────────────────────────
+  # PostgreSQL database
+  # ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: etl_dashboard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d etl_dashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl-net
+
+  # ──────────────────────────────────────────────────────────
+  # Express API server  →  http://host:8989
+  # ──────────────────────────────────────────────────────────
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    restart: unless-stopped
+    ports:
+      - "8989:8989"
+    environment:
+      PORT: 8989
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/etl_dashboard
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      GOOGLE_SERVICE_ACCOUNT_EMAIL: ${GOOGLE_SERVICE_ACCOUNT_EMAIL:-}
+      GOOGLE_PRIVATE_KEY: ${GOOGLE_PRIVATE_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - etl-net
+
+  # ──────────────────────────────────────────────────────────
+  # Nuxt 3 web app  →  http://host:9898
+  # ──────────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    ports:
+      - "9898:9898"
+    environment:
+      PORT: 9898
+      NODE_ENV: production
+      # Browser (client-side) calls — must be the public IP/domain
+      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE}
+      # SSR (server-side render) calls — routes directly inside Docker network
+      # This avoids exiting and re-entering the network on every SSR request.
+      NUXT_API_BASE_INTERNAL: http://server:8989/api
+    depends_on:
+      - server
+    networks:
+      - etl-net
+
+volumes:
+  pgdata:
+
+networks:
+  etl-net:
+    driver: bridge

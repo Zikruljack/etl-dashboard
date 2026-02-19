@@ -1,0 +1,48 @@
+# ============================================================
+# Stage 1 — Builder: install deps + compile TypeScript
+# ============================================================
+FROM node:20-alpine AS builder
+
+# Enable corepack so pnpm is available
+RUN corepack enable
+
+WORKDIR /app
+
+# Copy workspace manifest and lockfile first (layer cache for installs)
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Copy package manifests for each workspace member
+COPY packages/shared/package.json packages/shared/
+COPY apps/server/package.json        apps/server/
+
+# Install all dependencies (dev + prod) — needed for build
+RUN pnpm install --frozen-lockfile
+
+# Copy source files
+COPY packages/shared/ packages/shared/
+COPY apps/server/     apps/server/
+
+# Build shared types package first, then API server
+RUN pnpm --filter @etl-dashboard/shared build
+RUN pnpm --filter @etl-dashboard/server build
+
+# pnpm deploy: copy server + ALL production deps into a standalone directory
+# This bundles the compiled @etl-dashboard/shared into node_modules properly.
+RUN pnpm --filter @etl-dashboard/server deploy --prod /deploy/server
+
+# ============================================================
+# Stage 2 — Runner: lean image with only the deployed output
+# ============================================================
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+# Copy the standalone deployment produced by `pnpm deploy`
+COPY --from=builder /deploy/server ./
+
+EXPOSE 8989
+
+ENV PORT=8989 \
+    NODE_ENV=production
+
+CMD ["node", "dist/index.js"]

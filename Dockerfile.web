@@ -1,0 +1,46 @@
+# ============================================================
+# Stage 1 — Builder: install deps + build Nuxt
+# ============================================================
+FROM node:20-alpine AS builder
+
+# Enable corepack so pnpm is available
+RUN corepack enable
+
+WORKDIR /app
+
+# Copy workspace manifest and lockfile first (layer cache for installs)
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+
+# Copy package manifests for each workspace member
+COPY packages/shared/package.json packages/shared/
+COPY apps/web/package.json          apps/web/
+
+# Install all dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source files
+COPY packages/shared/ packages/shared/
+COPY apps/web/        apps/web/
+
+# Build shared types package first, then Nuxt app
+RUN pnpm --filter @etl-dashboard/shared build
+RUN pnpm --filter @etl-dashboard/web build
+
+# ============================================================
+# Stage 2 — Runner: lean image with Nuxt standalone output
+# Nuxt 3 `nuxt build` produces a self-contained .output/
+# directory that includes its own node_modules — no pnpm needed.
+# ============================================================
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+# Copy the self-contained Nuxt output
+COPY --from=builder /app/apps/web/.output ./
+
+EXPOSE 9898
+
+ENV PORT=9898 \
+    NODE_ENV=production
+
+CMD ["node", "server/index.mjs"]

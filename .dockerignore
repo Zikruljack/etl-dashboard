@@ -1,0 +1,39 @@
+# Dependencies (rebuilt inside Docker)
+node_modules
+**/node_modules
+
+# Git history
+.git
+.gitignore
+
+# Environment files (injected at runtime via docker-compose)
+.env
+.env.*
+!.env.example
+
+# Build artifacts (rebuilt inside Docker)
+dist
+**/dist
+.nuxt
+**/.nuxt
+.output
+**/.output
+
+# Nuxt dev cache
+**/.cache
+
+# Test artifacts
+e2e/test-results
+e2e/playwright-report
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode
+.idea
