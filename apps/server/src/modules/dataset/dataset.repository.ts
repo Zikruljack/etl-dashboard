@@ -33,6 +33,16 @@ class DatasetRepository extends BaseRepository<typeof datasets, DatasetRecord, D
   }
 
   /**
+   * List datasets created by a specific user.
+   *
+   * @param userId - Owner user ID
+   * @returns Array of datasets owned by the user
+   */
+  async findByCreator(userId: string): Promise<DatasetRecord[]> {
+    return this.findWhere(eq(datasets.createdBy, userId), datasets.createdAt);
+  }
+
+  /**
    * Update sync status of a dataset.
    *
    * @param id - Dataset UUID

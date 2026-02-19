@@ -38,12 +38,15 @@ export async function createDashboard(
 }
 
 /**
- * List all dashboard.
+ * List dashboards. Admin sees all; non-admin sees only their own.
  *
- * @returns Array of all dashboard ordered by creation date
+ * @param userId - Requesting user's ID
+ * @param role - Requesting user's role
+ * @returns Array of dashboards
  */
-export async function listdashboard(): Promise<DashboardRecord[]> {
-  return dashboardRepository.findAllOrdered();
+export async function listdashboard(userId: string, role: string): Promise<DashboardRecord[]> {
+  if (role === 'admin') return dashboardRepository.findAllOrdered();
+  return dashboardRepository.findByCreator(userId);
 }
 
 /**

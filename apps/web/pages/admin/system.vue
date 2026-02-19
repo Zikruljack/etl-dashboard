@@ -37,17 +37,35 @@
           </div>
         </div>
 
-        <!-- DB table counts -->
+        <!-- DB table sizes -->
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <h2 class="text-base font-semibold dark:text-gray-100 mb-4">Database Tables</h2>
-          <div class="space-y-1.5">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-semibold dark:text-gray-100">Database Tables</h2>
+            <span class="text-sm font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full">
+              Total: {{ formatBytes(sysInfo.database.totalSizeBytes) }}
+            </span>
+          </div>
+          <!-- Size bar chart per table -->
+          <div class="space-y-2">
             <div
               v-for="(count, table) in sysInfo.database.tableCounts"
               :key="table"
-              class="flex items-center justify-between text-sm"
             >
-              <span class="font-mono text-gray-500 dark:text-gray-400 text-xs">{{ table }}</span>
-              <span class="font-semibold text-gray-900 dark:text-gray-100">{{ count.toLocaleString() }}</span>
+              <div class="flex items-center justify-between text-xs mb-0.5">
+                <span class="font-mono text-gray-500 dark:text-gray-400">{{ table }}</span>
+                <div class="flex items-center gap-3">
+                  <span class="text-gray-400 dark:text-gray-500">{{ count.toLocaleString() }} rows</span>
+                  <span class="font-semibold text-gray-700 dark:text-gray-300 w-16 text-right">
+                    {{ formatBytes(sysInfo.database.tableSizes[table]?.totalBytes ?? 0) }}
+                  </span>
+                </div>
+              </div>
+              <div class="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-blue-500 dark:bg-blue-400 rounded-full transition-all duration-500"
+                  :style="{ width: tableSizePercent(table) + '%' }"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -61,6 +79,12 @@ definePageMeta({ middleware: 'auth', layout: 'admin' });
 
 const { $api } = useApi();
 
+interface TableSizeInfo {
+  totalBytes: number;
+  tableBytes: number;
+  indexBytes: number;
+}
+
 interface SysInfo {
   server: {
     nodeVersion: string;
@@ -71,7 +95,11 @@ interface SysInfo {
     cpus: number;
     hostname: string;
   };
-  database: { tableCounts: Record<string, number> };
+  database: {
+    tableCounts: Record<string, number>;
+    totalSizeBytes: number;
+    tableSizes: Record<string, TableSizeInfo>;
+  };
   app: { version: string; env: string };
 }
 
@@ -104,6 +132,23 @@ const serverRows = computed(() => {
     { label: 'Environment', value: sysInfo.value.app.env },
   ];
 });
+
+/** Format bytes to human-readable string (KB / MB / GB). */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+/** Returns width percentage of a table's size relative to the largest table. */
+function tableSizePercent(table: string): number {
+  if (!sysInfo.value) return 0;
+  const sizes = sysInfo.value.database.tableSizes;
+  const maxBytes = Math.max(...Object.values(sizes).map((s) => s.totalBytes), 1);
+  return Math.round(((sizes[table]?.totalBytes ?? 0) / maxBytes) * 100);
+}
 
 onMounted(() => refresh());
 

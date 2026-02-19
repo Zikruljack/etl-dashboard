@@ -44,6 +44,16 @@ class DashboardRepository extends BaseRepository<typeof dashboard, DashboardReco
   }
 
   /**
+   * List dashboards created by a specific user.
+   *
+   * @param userId - Owner user ID
+   * @returns Array of dashboards owned by the user
+   */
+  async findByCreator(userId: string): Promise<DashboardRecord[]> {
+    return this.findWhere(eq(dashboard.createdBy, userId), dashboard.createdAt);
+  }
+
+  /**
    * Get a dashboard with all pages and components.
    *
    * @param id - Dashboard UUID

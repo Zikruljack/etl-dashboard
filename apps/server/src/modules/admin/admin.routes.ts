@@ -82,6 +82,37 @@ router.get('/system', async (_req, res, next) => {
       }),
     );
 
+    // Total database size in bytes
+    const [dbSizeRow] = await db.execute<{ size_bytes: string }>(
+      sql.raw(`SELECT pg_database_size(current_database()) AS size_bytes`),
+    );
+    const totalSizeBytes = Number(dbSizeRow.size_bytes);
+
+    // Per-table size breakdown (data + indexes)
+    const tableSizeRows = await db.execute<{
+      table_name: string;
+      total_bytes: string;
+      table_bytes: string;
+      index_bytes: string;
+    }>(sql.raw(`
+      SELECT
+        relname AS table_name,
+        pg_total_relation_size(relid) AS total_bytes,
+        pg_relation_size(relid) AS table_bytes,
+        (pg_total_relation_size(relid) - pg_relation_size(relid)) AS index_bytes
+      FROM pg_stat_user_tables
+      ORDER BY total_bytes DESC
+    `));
+
+    const tableSizes: Record<string, { totalBytes: number; tableBytes: number; indexBytes: number }> = {};
+    for (const row of tableSizeRows) {
+      tableSizes[row.table_name] = {
+        totalBytes: Number(row.total_bytes),
+        tableBytes: Number(row.table_bytes),
+        indexBytes: Number(row.index_bytes),
+      };
+    }
+
     const memUsage = process.memoryUsage();
 
     sendSuccess(res, {
@@ -100,6 +131,8 @@ router.get('/system', async (_req, res, next) => {
       },
       database: {
         tableCounts: counts,
+        totalSizeBytes,
+        tableSizes,
       },
       app: {
         version: '0.1.0',

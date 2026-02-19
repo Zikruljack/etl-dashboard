@@ -33,12 +33,15 @@ export async function createDataset(data: CreateDatasetParams): Promise<DatasetR
 }
 
 /**
- * List all datasets ordered by creation date.
+ * List datasets. Admin sees all; non-admin sees only their own.
  *
- * @returns Array of all datasets
+ * @param userId - Requesting user's ID
+ * @param role - Requesting user's role
+ * @returns Array of datasets
  */
-export async function listDatasets(): Promise<DatasetRecord[]> {
-  return datasetRepository.findAllOrdered();
+export async function listDatasets(userId: string, role: string): Promise<DatasetRecord[]> {
+  if (role === 'admin') return datasetRepository.findAllOrdered();
+  return datasetRepository.findByCreator(userId);
 }
 
 /**

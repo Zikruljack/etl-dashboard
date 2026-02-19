@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, requireRole, validate } from '../../core/middleware/index.js';
 import { sendSuccess } from '../../core/response.js';
+import { AppError } from '../../core/errors.js';
 import { checkOwnership } from '../../core/security/idor-guard.js';
 import { dashboardRepository } from './dashboard.repository.js';
 import * as dashboardervice from './dashboard.service.js';
@@ -19,6 +20,19 @@ const createdashboardchema = z.object({
 /** Validation schema for creating a page */
 const createPageSchema = z.object({
   title: z.string().min(1).max(255),
+});
+
+/** Validation schema for updating a dashboard — whitelist allowed fields */
+const updateDashboardSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  description: z.string().max(1000).optional(),
+  isPublished: z.boolean().optional(),
+});
+
+/** Validation schema for updating a page — whitelist allowed fields */
+const updatePageSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  sortOrder: z.number().int().min(0).optional(),
 });
 
 /** Validation schema for bulk saving components */
@@ -46,11 +60,11 @@ const verifyDashboardOwner = checkOwnership({
 
 /**
  * GET /api/dashboard
- * List all dashboard.
+ * List dashboards. Admin sees all; others see only their own.
  */
-router.get('/', async (_req, res, next) => {
+router.get('/', async (req, res, next) => {
   try {
-    const list = await dashboardervice.listdashboard();
+    const list = await dashboardervice.listdashboard(req.user!.userId, req.user!.role);
     sendSuccess(res, list);
   } catch (err) { next(err); }
 });
@@ -73,19 +87,27 @@ router.post('/', requireRole('admin', 'editor'), validate(createdashboardchema),
 /**
  * GET /api/dashboard/:id
  * Get a dashboard with all pages and components.
+ * Non-owners can only view published dashboards.
  */
 router.get('/:id', async (req, res, next) => {
   try {
-    const dashboard = await dashboardervice.getDashboard(req.params.id as string);
-    sendSuccess(res, dashboard);
+    const dash = await dashboardervice.getDashboard(req.params.id as string);
+    // Non-admin users who don't own this dashboard may only see published ones
+    if (req.user?.role !== 'admin' && dash.createdBy !== req.user?.userId) {
+      if (!dash.isPublished) {
+        throw new AppError(404, 'Dashboard not found');
+      }
+    }
+    sendSuccess(res, dash);
   } catch (err) { next(err); }
 });
 
 /**
  * PATCH /api/dashboard/:id
  * Update dashboard metadata (owner or admin only).
+ * Validates only whitelisted fields to prevent mass assignment.
  */
-router.patch('/:id', requireRole('admin', 'editor'), verifyDashboardOwner, async (req, res, next) => {
+router.patch('/:id', requireRole('admin', 'editor'), verifyDashboardOwner, validate(updateDashboardSchema), async (req, res, next) => {
   try {
     const dashboard = await dashboardervice.updateDashboard(req.params.id as string, req.body);
     sendSuccess(res, dashboard);
@@ -119,8 +141,9 @@ router.post('/:id/pages', requireRole('admin', 'editor'), verifyDashboardOwner, 
 /**
  * PATCH /api/dashboard/:id/pages/:pid
  * Update a page's title or sort order.
+ * Validates only whitelisted fields to prevent mass assignment.
  */
-router.patch('/:id/pages/:pid', requireRole('admin', 'editor'), verifyDashboardOwner, async (req, res, next) => {
+router.patch('/:id/pages/:pid', requireRole('admin', 'editor'), verifyDashboardOwner, validate(updatePageSchema), async (req, res, next) => {
   try {
     const page = await dashboardervice.updatePage(req.params.pid as string, req.body);
     sendSuccess(res, page);

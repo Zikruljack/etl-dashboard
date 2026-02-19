@@ -13,6 +13,53 @@ const log = logger.child({ module: 'rest-connector' });
 /** Safety limit to prevent runaway fetches */
 const MAX_ROWS = 10_000;
 
+/**
+ * Patterns matching private/internal IP ranges and loopback addresses.
+ * Used to block SSRF attacks that target internal infrastructure.
+ */
+const PRIVATE_IP_PATTERNS: RegExp[] = [
+  /^localhost$/i,
+  /^127\./,           // 127.0.0.0/8 — loopback
+  /^10\./,            // 10.0.0.0/8 — RFC 1918
+  /^172\.(1[6-9]|2\d|3[01])\./,  // 172.16.0.0/12 — RFC 1918
+  /^192\.168\./,      // 192.168.0.0/16 — RFC 1918
+  /^169\.254\./,      // 169.254.0.0/16 — link-local / cloud metadata
+  /^0\./,             // 0.0.0.0/8
+  /^::1$/,            // IPv6 loopback
+  /^fc00:/i,          // IPv6 unique local
+  /^fd/i,             // IPv6 unique local
+  /^\[::1\]$/,        // IPv6 loopback with brackets
+];
+
+/**
+ * Validate that a URL is safe to fetch from the server.
+ * Rejects non-HTTP protocols and requests to private/internal IP ranges
+ * to prevent Server-Side Request Forgery (SSRF) attacks.
+ *
+ * @param rawUrl - URL string to validate
+ * @throws AppError(400) if the URL is invalid, uses a non-HTTP protocol,
+ *   or targets a private/internal address
+ */
+function assertSafeUrl(rawUrl: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new AppError(400, `Invalid URL: "${rawUrl}"`);
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new AppError(400, `Only http and https protocols are allowed (got "${parsed.protocol}")`);
+  }
+
+  const hostname = parsed.hostname;
+  for (const pattern of PRIVATE_IP_PATTERNS) {
+    if (pattern.test(hostname)) {
+      throw new AppError(400, 'Requests to private or internal addresses are not allowed');
+    }
+  }
+}
+
 /** REST auth types */
 export type RestAuthType = 'none' | 'bearer' | 'api_key_header' | 'basic';
 
@@ -132,6 +179,9 @@ function arrayOfObjectsToCellGrid(rows: Record<string, unknown>[]): CellGrid {
  * @throws AppError(502) if the remote endpoint returns an error
  */
 export async function fetchRestApi(config: RestConnectorConfig): Promise<RestFetchResult> {
+  // Validate URL before making any network request — prevents SSRF
+  assertSafeUrl(config.url);
+
   log.info('Fetching REST API', { url: config.url, method: config.method ?? 'GET' });
 
   let response: Response;
@@ -140,6 +190,7 @@ export async function fetchRestApi(config: RestConnectorConfig): Promise<RestFet
       method: config.method ?? 'GET',
       headers: buildHeaders(config),
       body: config.method === 'POST' && config.requestBody ? config.requestBody : undefined,
+      signal: AbortSignal.timeout(15_000),  // 15-second hard timeout
     });
   } catch (err) {
     throw new AppError(502, `Failed to connect to "${config.url}": ${(err as Error).message}`);

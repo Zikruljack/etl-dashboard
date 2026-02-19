@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticate, requireRole, validate } from '../../core/middleware/index.js';
 import { sendSuccess, sendPaginated } from '../../core/response.js';
 import { parsePagination, buildPaginationMeta } from '../../core/pagination.js';
+import { AppError } from '../../core/errors.js';
 import { checkOwnership } from '../../core/security/idor-guard.js';
 import { datasetRepository } from './dataset.repository.js';
 import * as datasetService from './dataset.service.js';
@@ -80,11 +81,11 @@ const verifyDatasetOwner = checkOwnership({
 
 /**
  * GET /api/datasets
- * List all datasets.
+ * List datasets. Admin sees all; non-admin sees only their own.
  */
-router.get('/', async (_req, res, next) => {
+router.get('/', async (req, res, next) => {
   try {
-    const datasets = await datasetService.listDatasets();
+    const datasets = await datasetService.listDatasets(req.user!.userId, req.user!.role);
     sendSuccess(res, datasets);
   } catch (err) { next(err); }
 });
@@ -105,9 +106,9 @@ router.post('/', requireRole('admin', 'editor'), validate(createDatasetSchema), 
 
 /**
  * GET /api/datasets/:id
- * Get a single dataset by ID.
+ * Get a single dataset by ID (owner or admin only).
  */
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', verifyDatasetOwner, async (req, res, next) => {
   try {
     const dataset = await datasetService.getDataset(req.params.id as string);
     sendSuccess(res, dataset);
@@ -150,9 +151,9 @@ router.post('/:id/sync', requireRole('admin', 'editor'), verifyDatasetOwner, asy
 
 /**
  * GET /api/datasets/:id/data
- * Get paginated row data for a dataset.
+ * Get paginated row data for a dataset (owner or admin only).
  */
-router.get('/:id/data', async (req, res, next) => {
+router.get('/:id/data', verifyDatasetOwner, async (req, res, next) => {
   try {
     const { page, pageSize } = parsePagination(req);
     const result = await datasetService.getDatasetData(req.params.id as string, { page, pageSize });
@@ -162,9 +163,9 @@ router.get('/:id/data', async (req, res, next) => {
 
 /**
  * GET /api/datasets/:id/columns
- * Get column definitions for a dataset.
+ * Get column definitions for a dataset (owner or admin only).
  */
-router.get('/:id/columns', async (req, res, next) => {
+router.get('/:id/columns', verifyDatasetOwner, async (req, res, next) => {
   try {
     const dataset = await datasetService.getDataset(req.params.id as string);
     sendSuccess(res, dataset.columns);
@@ -185,9 +186,9 @@ router.post('/:id/re-extract', requireRole('admin', 'editor'), verifyDatasetOwne
 
 /**
  * GET /api/datasets/:id/raw
- * Get the latest raw snapshot for a dataset.
+ * Get the latest raw snapshot for a dataset (owner or admin only).
  */
-router.get('/:id/raw', async (req, res, next) => {
+router.get('/:id/raw', verifyDatasetOwner, async (req, res, next) => {
   try {
     const snapshot = await snapshotRepository.findLatestByDataset(req.params.id as string);
     sendSuccess(res, snapshot);
@@ -196,11 +197,18 @@ router.get('/:id/raw', async (req, res, next) => {
 
 /**
  * POST /api/data/query
- * Flexible data query for dashboard widgets.
+ * Flexible data query for dashboard widgets (owner or admin only).
  * Supports filtering, sorting, aggregation, column selection.
  */
 router.post('/query', validate(querySchema), async (req, res, next) => {
   try {
+    // Ownership check — user must own the queried dataset or be admin
+    const { datasetId } = req.body as { datasetId: string };
+    const targetDataset = await datasetRepository.findById(datasetId);
+    if (!targetDataset) throw new AppError(404, 'Dataset not found');
+    if (req.user?.role !== 'admin' && targetDataset.createdBy !== req.user?.userId) {
+      throw new AppError(404, 'Dataset not found');
+    }
     const result = await dataService.queryData(req.body);
     sendSuccess(res, result);
   } catch (err) { next(err); }
