@@ -120,6 +120,12 @@ export const useWizardStore = defineStore('wizard', {
       }
     },
 
+    /** Whether currently on the last sheet in batch mode */
+    isLastSheet(): boolean {
+      return this.multiSheet.mode === 'separate'
+        && this.multiSheet.currentIndex >= this.multiSheet.sheets.length - 1;
+    },
+
     /** Steps list with completion status */
     steps(): Array<{ id: WizardStep; label: string; completed: boolean; active: boolean }> {
       const order: WizardStep[] = ['connect', 'preview', 'extract', 'configure'];
@@ -292,14 +298,6 @@ export const useWizardStore = defineStore('wizard', {
         this.preview = null;
         this.step = 'preview';
       }
-    },
-
-    /**
-     * Check if currently on the last sheet in batch mode.
-     */
-    get isLastSheet(): boolean {
-      return this.multiSheet.mode === 'separate'
-        && this.multiSheet.currentIndex >= this.multiSheet.sheets.length - 1;
     },
 
     /**

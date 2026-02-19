@@ -146,7 +146,7 @@
  * Emits config changes and handles test connection.
  */
 
-const { $api } = useNuxtApp();
+const { $api } = useApi();
 
 /** REST connector config state */
 const config = reactive({
@@ -211,9 +211,10 @@ async function testConnection() {
       message: `Connected. Found ${res.data.sampleRows} rows, ${res.data.columns.length} columns: ${res.data.columns.slice(0, 5).join(', ')}${res.data.columns.length > 5 ? '...' : ''}`,
     };
   } catch (err: unknown) {
+    const e = err as { data?: { message?: string }; message?: string };
     testResult.value = {
       ok: false,
-      message: (err as Error).message ?? 'Connection failed',
+      message: e?.data?.message || e?.message || 'Connection failed',
     };
   } finally {
     testing.value = false;

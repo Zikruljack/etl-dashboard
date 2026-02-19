@@ -369,6 +369,8 @@
 
 <script setup lang="ts">
 import type { ApiResponse, FetchRawResponse, ExtractionPreview, SheetUploadResult } from '@etl-dashboard/shared';
+import FileUploadConfig from '~/components/source/FileUploadConfig.vue';
+import RestApiConfig from '~/components/source/RestApiConfig.vue';
 
 definePageMeta({ middleware: 'auth' });
 
@@ -654,7 +656,8 @@ function toggleKeyColumn(column: string) {
 
 /** Step navigation: Connect -> Preview */
 async function handleConnectNext() {
-  if (!wizard.canProceed) return;
+  // REST API bypasses canProceed check — source.meta is set after fetch, not before
+  if (!isRestApiSource.value && !wizard.canProceed) return;
 
   if (isFileSource.value) {
     // File already uploaded and parsed — raw data is already in wizard
