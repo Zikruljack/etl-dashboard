@@ -7,3 +7,6 @@ dist
 .DS_Store
 .claude/settings.local.json
 playwright-output/
+e2e/
+CLAUDE.md
+docs/

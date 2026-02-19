@@ -135,7 +135,7 @@ async function reload() {
     if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
 
     const res = await $api<any>(`/admin/logs?${params}`);
-    logs.value = res.data;
+    logs.value = res.data ?? [];
     total.value = res.pagination?.total ?? 0;
   } catch (e) {
     console.error('Failed to load logs', e);

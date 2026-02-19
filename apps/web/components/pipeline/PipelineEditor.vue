@@ -113,7 +113,7 @@ const effectiveColumns = computed(() => props.columns ?? []);
           type="text"
           class="w-full text-sm border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-800 font-medium"
           placeholder="Pipeline name"
-          v-onInput="isDirty"
+          @input="isDirty = true"
         />
       </div>
 
@@ -158,7 +158,7 @@ const effectiveColumns = computed(() => props.columns ?? []);
     <!-- Step list -->
     <div v-else class="space-y-2">
       <div v-for="(step, idx) in steps" :key="step._clientId">
-        <PipelineStepCard
+        <StepCard
           :step="step"
           :index="idx"
           :total="steps.length"
@@ -170,7 +170,7 @@ const effectiveColumns = computed(() => props.columns ?? []);
         />
         <!-- Config form (inline expand) -->
         <div v-if="expandedIdx === idx">
-          <PipelineStepConfig
+          <StepConfig
             :step="step"
             :columns="effectiveColumns"
             @update="updateStepConfig(step._clientId, $event)"
@@ -206,6 +206,6 @@ const effectiveColumns = computed(() => props.columns ?? []);
     </div>
 
     <!-- Preview panel -->
-    <PipelineStepPreview :preview="preview" :loading="previewing" />
+    <StepPreview :preview="preview" :loading="previewing" />
   </div>
 </template>

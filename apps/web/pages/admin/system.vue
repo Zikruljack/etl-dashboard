@@ -111,7 +111,7 @@ async function refresh() {
   loading.value = true;
   try {
     const res = await $api<{ success: boolean; data: SysInfo }>('/admin/system');
-    sysInfo.value = res.data;
+    sysInfo.value = res.data ?? null;
   } catch (e) {
     console.error('Failed to load system info', e);
   } finally {
