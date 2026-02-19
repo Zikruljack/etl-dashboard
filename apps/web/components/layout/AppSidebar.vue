@@ -72,6 +72,13 @@
             {{ authStore.user?.role }}
           </p>
         </div>
+        <button
+          class="text-gray-500 hover:text-white p-1 rounded transition-colors shrink-0"
+          title="Sign out"
+          @click="handleLogout"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+        </button>
       </div>
     </div>
   </aside>
@@ -99,14 +106,22 @@ watch(() => route.path, () => close());
 const mainItems = [
   { to: '/dashboard', label: 'Dashboards', icon: '📊' },
   { to: '/datasets', label: 'Datasets', icon: '📁' },
+  { to: '/account/api-keys', label: 'API Keys', icon: '🔑' },
 ];
 
 const adminItems = [
   { to: '/admin/users', label: 'Users', icon: '👥' },
   { to: '/admin/datasets', label: 'Datasets', icon: '🗂️' },
   { to: '/admin/dashboard', label: 'Dashboards', icon: '📋' },
+  { to: '/admin/api-keys', label: 'API Keys', icon: '🗝️' },
   { to: '/admin/system', label: 'System', icon: '🖥️' },
 ];
+
+/** Sign out and redirect to login */
+async function handleLogout() {
+  authStore.logout();
+  await navigateTo('/login');
+}
 
 const userInitials = computed(() => {
   const name = authStore.user?.name || '';

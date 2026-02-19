@@ -1,7 +1,7 @@
 import { pgTable, uuid, varchar, text, timestamp, integer, jsonb, pgEnum, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
 
-export const sourceTypeEnum = pgEnum('source_type', ['google_sheets', 'csv', 'excel']);
+export const sourceTypeEnum = pgEnum('source_type', ['google_sheets', 'csv', 'excel', 'rest_api']);
 export const syncStatusEnum = pgEnum('sync_status', ['idle', 'syncing', 'error', 'success']);
 
 export const datasets = pgTable('datasets', {

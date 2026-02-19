@@ -8,6 +8,8 @@ import type {
   ExtractionConfig,
   CellGrid,
   ExtractionPreview,
+  SheetUploadResult,
+  MultiSheetMode,
 } from '@etl-dashboard/shared';
 
 /** Active wizard step */
@@ -15,9 +17,21 @@ export type WizardStep = 'connect' | 'preview' | 'extract' | 'configure' | 'load
 
 /** Source connection info */
 interface SourceInfo {
-  sourceType: 'google_sheets' | 'csv' | 'excel';
+  sourceType: 'google_sheets' | 'csv' | 'excel' | 'rest_api';
   sourceConfig: Record<string, unknown>;
   meta: { title: string; sheets: string[] } | null;
+}
+
+/** Multi-sheet batch state */
+interface MultiSheetState {
+  /** null = not in batch mode */
+  mode: MultiSheetMode | null;
+  /** All sheets to process */
+  sheets: SheetUploadResult[];
+  /** Current sheet index being processed */
+  currentIndex: number;
+  /** Dataset IDs created so far */
+  completedDatasetIds: string[];
 }
 
 /** Wizard state */
@@ -41,6 +55,8 @@ interface WizardState {
   /** Loading/error states */
   isProcessing: boolean;
   error: string | null;
+  /** Multi-sheet batch mode state */
+  multiSheet: MultiSheetState;
 }
 
 /**
@@ -79,6 +95,12 @@ export const useWizardStore = defineStore('wizard', {
     datasetDescription: '',
     isProcessing: false,
     error: null,
+    multiSheet: {
+      mode: null,
+      sheets: [],
+      currentIndex: 0,
+      completedDatasetIds: [],
+    },
   }),
 
   getters: {
@@ -127,7 +149,7 @@ export const useWizardStore = defineStore('wizard', {
      * @param meta - Source metadata (title, sheets)
      */
     setSource(
-      sourceType: 'google_sheets' | 'csv' | 'excel',
+      sourceType: 'google_sheets' | 'csv' | 'excel' | 'rest_api',
       sourceConfig: Record<string, unknown>,
       meta: { title: string; sheets: string[] },
     ) {
@@ -229,6 +251,55 @@ export const useWizardStore = defineStore('wizard', {
         this.step = order[currentIdx - 1]!;
         this.error = null;
       }
+    },
+
+    /**
+     * Initialize multi-sheet batch mode.
+     *
+     * @param mode - 'separate' or 'merge'
+     * @param sheets - Parsed sheet results from backend
+     */
+    initMultiSheet(mode: MultiSheetMode, sheets: SheetUploadResult[]) {
+      this.multiSheet = {
+        mode,
+        sheets,
+        currentIndex: 0,
+        completedDatasetIds: [],
+      };
+      // Load first sheet into wizard
+      const first = sheets[0];
+      if (first) {
+        this.setRawData(first.snapshotId, first.data, first.totalRows, first.totalCols);
+        this.datasetName = first.sheetName;
+      }
+    },
+
+    /**
+     * Advance to the next sheet in batch mode.
+     * Resets extraction config and preview for the new sheet.
+     *
+     * @param completedDatasetId - Dataset ID just created
+     */
+    advanceToNextSheet(completedDatasetId: string) {
+      this.multiSheet.completedDatasetIds.push(completedDatasetId);
+      this.multiSheet.currentIndex++;
+
+      const next = this.multiSheet.sheets[this.multiSheet.currentIndex];
+      if (next) {
+        this.setRawData(next.snapshotId, next.data, next.totalRows, next.totalCols);
+        this.datasetName = next.sheetName;
+        this.datasetDescription = '';
+        this.preview = null;
+        this.step = 'preview';
+      }
+    },
+
+    /**
+     * Check if currently on the last sheet in batch mode.
+     */
+    get isLastSheet(): boolean {
+      return this.multiSheet.mode === 'separate'
+        && this.multiSheet.currentIndex >= this.multiSheet.sheets.length - 1;
     },
 
     /**

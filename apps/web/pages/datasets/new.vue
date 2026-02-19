@@ -38,6 +38,36 @@
       </div>
     </div>
 
+    <!-- Multi-Sheet Batch Progress -->
+    <div
+      v-if="wizard.multiSheet.mode === 'separate' && wizard.multiSheet.sheets.length > 0"
+      class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl"
+    >
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-semibold text-blue-900 dark:text-blue-200">
+            Sheet {{ wizard.multiSheet.currentIndex + 1 }} of {{ wizard.multiSheet.sheets.length }}:
+            {{ wizard.multiSheet.sheets[wizard.multiSheet.currentIndex]?.sheetName }}
+          </p>
+          <p class="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+            {{ wizard.multiSheet.completedDatasetIds.length }} sheet(s) completed
+          </p>
+        </div>
+        <div class="flex gap-1.5">
+          <div
+            v-for="(_, idx) in wizard.multiSheet.sheets"
+            :key="idx"
+            class="w-2.5 h-2.5 rounded-full transition-colors"
+            :class="{
+              'bg-green-500': idx < wizard.multiSheet.currentIndex,
+              'bg-blue-500': idx === wizard.multiSheet.currentIndex,
+              'bg-gray-300 dark:bg-gray-600': idx > wizard.multiSheet.currentIndex,
+            }"
+          ></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Error Banner -->
     <div v-if="wizard.error" class="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400 flex items-start gap-2">
       <span class="text-red-500 mt-0.5">&#9888;</span>
@@ -117,6 +147,7 @@
               @file-selected="handleFileSelected"
               @file-cleared="handleFileCleared"
               @sheet-changed="handleSheetChanged"
+              @multi-sheet-configured="handleMultiSheetConfigured"
             />
           </div>
 
@@ -126,6 +157,22 @@
             <div>
               <p class="text-sm text-green-800 dark:text-green-300 font-semibold">File uploaded: {{ wizard.source.meta.title }}</p>
               <p class="text-xs text-green-600 dark:text-green-400 mt-0.5">{{ wizard.totalRows }} rows &times; {{ wizard.totalCols }} columns</p>
+            </div>
+          </div>
+        </template>
+
+        <!-- REST API Config -->
+        <template v-if="sourceType === 'rest_api'">
+          <div class="mt-4">
+            <RestApiConfig ref="restApiConfigRef" />
+          </div>
+
+          <!-- Fetch success -->
+          <div v-if="wizard.source.meta && isRestApiSource" class="mt-4 p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl flex items-start gap-3">
+            <span class="text-green-600 dark:text-green-400 text-lg">&#10003;</span>
+            <div>
+              <p class="text-sm text-green-800 dark:text-green-300 font-semibold">Connected: {{ wizard.source.meta.title }}</p>
+              <p class="text-xs text-green-600 dark:text-green-400 mt-0.5">{{ wizard.totalRows }} rows &times; {{ wizard.totalCols }} columns fetched</p>
             </div>
           </div>
         </template>
@@ -286,10 +333,10 @@
         <button
           v-if="wizard.step === 'connect'"
           @click="handleConnectNext"
-          :disabled="!wizard.canProceed || uploadingFile"
+          :disabled="(!wizard.canProceed && !isRestApiSource) || uploadingFile || fetchingRaw"
           class="btn-primary"
         >
-          {{ uploadingFile ? 'Uploading...' : 'Next &rarr;' }}
+          {{ uploadingFile ? 'Uploading...' : fetchingRaw ? 'Fetching...' : isRestApiSource ? 'Fetch Data &rarr;' : 'Next &rarr;' }}
         </button>
         <button
           v-else-if="wizard.step === 'preview'"
@@ -321,7 +368,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ApiResponse, FetchRawResponse, ExtractionPreview } from '@etl-dashboard/shared';
+import type { ApiResponse, FetchRawResponse, ExtractionPreview, SheetUploadResult } from '@etl-dashboard/shared';
 
 definePageMeta({ middleware: 'auth' });
 
@@ -332,9 +379,10 @@ const wizard = useWizardStore();
 
 // Component refs
 const fileUploadRef = ref<InstanceType<typeof FileUploadConfig> | null>(null);
+const restApiConfigRef = ref<InstanceType<typeof RestApiConfig> | null>(null);
 
 // Local state
-const sourceType = ref<'google_sheets' | 'csv' | 'excel'>(wizard.source.sourceType);
+const sourceType = ref<'google_sheets' | 'csv' | 'excel' | 'rest_api'>(wizard.source.sourceType);
 const spreadsheetId = ref((wizard.source.sourceConfig.spreadsheetId as string) || '');
 const sheetName = ref((wizard.source.sourceConfig.sheetName as string) || '');
 const availableSheets = ref<string[]>(wizard.source.meta?.sheets || []);
@@ -347,12 +395,16 @@ const selectedSheetName = ref('');
 /** Whether the current source type is file-based */
 const isFileSource = computed(() => sourceType.value === 'csv' || sourceType.value === 'excel');
 
+/** Whether the current source type is REST API */
+const isRestApiSource = computed(() => sourceType.value === 'rest_api');
+
 /** Human-readable source type label */
 const sourceTypeLabel = computed(() => {
   const labels: Record<string, string> = {
     google_sheets: 'Google Sheets',
     csv: 'CSV File',
     excel: 'Excel File',
+    rest_api: 'REST API',
   };
   return labels[wizard.source.sourceType] || wizard.source.sourceType;
 });
@@ -500,7 +552,7 @@ async function uploadFile(file: File, sheetNameOverride?: string) {
 }
 
 /**
- * Fetch raw data from Google Sheets source.
+ * Fetch raw data from Google Sheets or REST API source.
  */
 async function fetchRawData() {
   fetchingRaw.value = true;
@@ -520,6 +572,49 @@ async function fetchRawData() {
     wizard.error = err?.data?.message || 'Failed to fetch raw data';
   } finally {
     fetchingRaw.value = false;
+  }
+}
+
+/**
+ * Handle multi-sheet configuration emitted from FileUploadConfig.
+ * Initializes wizard batch mode and navigates to the preview step.
+ *
+ * @param payload - Mode + loaded sheet snapshots from the upload-multi-sheet API
+ */
+async function handleMultiSheetConfigured(payload: { mode: 'separate' | 'merge'; sheets: SheetUploadResult[] }) {
+  wizard.error = null;
+
+  if (payload.mode === 'separate') {
+    // Batch mode: process each sheet independently
+    wizard.initMultiSheet('separate', payload.sheets);
+    wizard.setSource(
+      sourceType.value as 'csv' | 'excel',
+      wizard.source.sourceConfig,
+      { title: wizard.source.meta?.title || '', sheets: payload.sheets.map((s) => s.sheetName) },
+    );
+    wizard.goTo('preview');
+  } else {
+    // Merge mode: save merged snapshot on backend, then use as single wizard flow
+    wizard.isProcessing = true;
+    try {
+      const snapshotIds = payload.sheets.map((s) => s.snapshotId);
+      const res = await $api<ApiResponse<FetchRawResponse>>('/sources/merge-snapshot', {
+        method: 'POST',
+        body: { snapshotIds },
+      });
+      wizard.setRawData(res.data.snapshotId, res.data.data, res.data.totalRows, res.data.totalCols);
+      wizard.setSource(
+        sourceType.value as 'csv' | 'excel',
+        wizard.source.sourceConfig,
+        { title: wizard.source.meta?.title || '', sheets: payload.sheets.map((s) => s.sheetName) },
+      );
+      wizard.goTo('preview');
+    } catch (e: unknown) {
+      const err = e as { data?: { message?: string } };
+      wizard.error = err?.data?.message || 'Failed to merge sheets';
+    } finally {
+      wizard.isProcessing = false;
+    }
   }
 }
 
@@ -565,6 +660,45 @@ async function handleConnectNext() {
     // File already uploaded and parsed — raw data is already in wizard
     // Skip the fetch-raw step and go directly to preview
     wizard.nextStep();
+  } else if (isRestApiSource.value) {
+    // REST API: fetch raw data now using the config from RestApiConfig component
+    const restConfig = restApiConfigRef.value?.config;
+    if (!restConfig?.url) {
+      wizard.error = 'Please enter a valid URL and test the connection first.';
+      return;
+    }
+
+    fetchingRaw.value = true;
+    wizard.error = null;
+    try {
+      const sourceConfig: Record<string, unknown> = {
+        connector: 'rest_api',
+        url: restConfig.url,
+        method: restConfig.method,
+        authType: restConfig.authType,
+        authToken: restConfig.authToken || undefined,
+        authHeaderName: restConfig.authHeaderName || undefined,
+        authUsername: restConfig.authUsername || undefined,
+        authPassword: restConfig.authPassword || undefined,
+        requestBody: restConfig.requestBody || undefined,
+        jsonPath: restConfig.jsonPath || undefined,
+        extraHeaders: Object.keys(restConfig.extraHeaders ?? {}).length ? restConfig.extraHeaders : undefined,
+      };
+
+      const res = await $api<ApiResponse<FetchRawResponse>>('/sources/fetch-raw', {
+        method: 'POST',
+        body: { sourceType: 'rest_api', sourceConfig },
+      });
+
+      wizard.setRawData(res.data.snapshotId, res.data.data, res.data.totalRows, res.data.totalCols);
+      wizard.setSource('rest_api', sourceConfig, { title: restConfig.url, sheets: [] });
+      wizard.nextStep();
+    } catch (e: unknown) {
+      const err = e as { data?: { message?: string } };
+      wizard.error = err?.data?.message || 'Failed to fetch data from REST API';
+    } finally {
+      fetchingRaw.value = false;
+    }
   } else {
     wizard.nextStep();
     // Auto-fetch if no raw data yet (Google Sheets)
@@ -601,6 +735,7 @@ async function handleExtractNext() {
 
 /**
  * Final step: create dataset from extraction.
+ * In multi-sheet batch (separate) mode, advances to the next sheet after creation.
  */
 async function handleCreateDataset() {
   if (!wizard.canProceed || wizard.isProcessing) return;
@@ -624,7 +759,25 @@ async function handleCreateDataset() {
       },
     );
 
-    navigateTo(`/datasets/${res.data.dataset.id}`);
+    const createdId = res.data.dataset.id;
+
+    // Multi-sheet batch mode: advance to next sheet or finish
+    if (wizard.multiSheet.mode === 'separate') {
+      const isLast = wizard.multiSheet.currentIndex >= wizard.multiSheet.sheets.length - 1;
+      if (isLast) {
+        // All sheets done — navigate to datasets list
+        wizard.multiSheet.completedDatasetIds.push(createdId);
+        navigateTo('/datasets');
+      } else {
+        // Advance to next sheet
+        wizard.advanceToNextSheet(createdId);
+        // Preview step for next sheet
+        wizard.preview = null;
+        await loadPreview();
+      }
+    } else {
+      navigateTo(`/datasets/${createdId}`);
+    }
   } catch (e: unknown) {
     const err = e as { data?: { message?: string } };
     wizard.error = err?.data?.message || 'Failed to create dataset';

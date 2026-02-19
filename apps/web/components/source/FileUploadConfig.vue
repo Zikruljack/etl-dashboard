@@ -49,12 +49,73 @@
       </template>
     </div>
 
-    <!-- Sheet selector for Excel files -->
-    <div v-if="sheetNames.length > 1">
-      <label class="form-label">Sheet</label>
-      <select v-model="selectedSheet" class="form-input">
-        <option v-for="name in sheetNames" :key="name" :value="name">{{ name }}</option>
-      </select>
+    <!-- Multi-sheet UI for Excel files with multiple sheets -->
+    <div v-if="sheetNames.length > 1" class="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+      <div>
+        <h4 class="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-1">Multiple Sheets Detected ({{ sheetNames.length }} sheets)</h4>
+        <p class="text-xs text-blue-600 dark:text-blue-400">Select which sheets to include and choose a mode.</p>
+      </div>
+
+      <!-- Sheet checkboxes -->
+      <div>
+        <label class="form-label text-blue-800 dark:text-blue-300 mb-2 block">Select Sheets</label>
+        <div class="flex flex-wrap gap-2">
+          <label
+            v-for="name in sheetNames"
+            :key="name"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-sm cursor-pointer transition-all"
+            :class="selectedSheets.includes(name)
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedSheets.includes(name)"
+              class="sr-only"
+              @change="toggleSheetSelection(name)"
+            />
+            {{ name }}
+          </label>
+        </div>
+      </div>
+
+      <!-- Mode selection -->
+      <div>
+        <label class="form-label text-blue-800 dark:text-blue-300 mb-2 block">Mode</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label
+            class="flex items-start gap-2.5 p-3 border rounded-lg cursor-pointer transition-all"
+            :class="multiSheetMode === 'separate' ? 'bg-white dark:bg-gray-800 border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300'"
+          >
+            <input v-model="multiSheetMode" type="radio" value="separate" class="mt-0.5" />
+            <div>
+              <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Separate Datasets</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Create one dataset per sheet (independent extraction config)</p>
+            </div>
+          </label>
+          <label
+            class="flex items-start gap-2.5 p-3 border rounded-lg cursor-pointer transition-all"
+            :class="multiSheetMode === 'merge' ? 'bg-white dark:bg-gray-800 border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-300'"
+          >
+            <input v-model="multiSheetMode" type="radio" value="merge" class="mt-0.5" />
+            <div>
+              <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Merge into One</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Combine all selected sheets row-wise (same column structure required)</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Apply button -->
+      <button
+        v-if="multiSheetMode && selectedSheets.length > 0"
+        type="button"
+        class="btn-primary text-sm"
+        :disabled="loadingMultiSheet"
+        @click="applyMultiSheet"
+      >
+        {{ loadingMultiSheet ? 'Loading Sheets...' : `Load ${selectedSheets.length} Sheet(s)` }}
+      </button>
     </div>
 
     <!-- Error -->
@@ -71,6 +132,10 @@
  * After upload, emits the parsed result (same shape as fetch-raw).
  */
 
+import type { SheetUploadResult } from '@etl-dashboard/shared';
+
+const { $api } = useNuxtApp();
+
 interface Props {
   /** Source type: 'csv' or 'excel' */
   sourceType: 'csv' | 'excel';
@@ -85,8 +150,10 @@ const emit = defineEmits<{
   'file-selected': [file: File];
   /** Emitted when the file is cleared */
   'file-cleared': [];
-  /** Emitted when sheet selection changes (Excel) */
+  /** Emitted when sheet selection changes (Excel, single sheet) */
   'sheet-changed': [sheetName: string];
+  /** Emitted when multi-sheet mode is applied and sheets are loaded */
+  'multi-sheet-configured': [payload: { mode: 'separate' | 'merge'; sheets: SheetUploadResult[] }];
 }>();
 
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -95,6 +162,56 @@ const selectedFile = ref<File | null>(null);
 const uploadError = ref<string | null>(null);
 const sheetNames = ref<string[]>([]);
 const selectedSheet = ref('');
+
+// Multi-sheet state
+const selectedSheets = ref<string[]>([]);
+const multiSheetMode = ref<'separate' | 'merge' | null>(null);
+const loadingMultiSheet = ref(false);
+
+/**
+ * Toggle a sheet's inclusion in the selection.
+ *
+ * @param name - Sheet name to toggle
+ */
+function toggleSheetSelection(name: string) {
+  const idx = selectedSheets.value.indexOf(name);
+  if (idx >= 0) {
+    selectedSheets.value.splice(idx, 1);
+  } else {
+    selectedSheets.value.push(name);
+  }
+}
+
+/**
+ * Upload selected sheets to the multi-sheet endpoint and emit the result.
+ * Calls POST /sources/upload-multi-sheet with selected sheet names.
+ */
+async function applyMultiSheet() {
+  if (!selectedFile.value || !multiSheetMode.value || selectedSheets.value.length === 0) return;
+
+  loadingMultiSheet.value = true;
+  uploadError.value = null;
+
+  try {
+    const formData = new FormData();
+    formData.append('file', selectedFile.value);
+    formData.append('sheetNames', JSON.stringify(selectedSheets.value));
+
+    const res = await $api<{ success: boolean; data: { sheets: SheetUploadResult[] } }>(
+      '/sources/upload-multi-sheet',
+      { method: 'POST', body: formData },
+    );
+
+    emit('multi-sheet-configured', {
+      mode: multiSheetMode.value,
+      sheets: res.data.sheets,
+    });
+  } catch (err: unknown) {
+    uploadError.value = (err as Error).message ?? 'Failed to load sheets.';
+  } finally {
+    loadingMultiSheet.value = false;
+  }
+}
 
 /** File accept attribute based on source type */
 const acceptString = computed(() => {
@@ -178,24 +295,32 @@ function validateAndSet(file: File) {
 }
 
 /**
- * Clear selected file.
+ * Clear selected file and reset all state.
  */
 function clearFile() {
   selectedFile.value = null;
   sheetNames.value = [];
   selectedSheet.value = '';
   uploadError.value = null;
+  selectedSheets.value = [];
+  multiSheetMode.value = null;
+  loadingMultiSheet.value = false;
   emit('file-cleared');
 }
 
 /**
  * Set available sheet names (called from parent after upload response).
+ * Auto-selects all sheets by default for multi-sheet mode.
+ *
+ * @param names - Array of sheet names from the uploaded Excel file
  */
 function setSheetNames(names: string[]) {
   sheetNames.value = names;
   if (names.length > 0 && !selectedSheet.value) {
     selectedSheet.value = names[0];
   }
+  // Auto-select all sheets for multi-sheet selection
+  selectedSheets.value = [...names];
 }
 
 /**

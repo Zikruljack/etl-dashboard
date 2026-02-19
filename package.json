@@ -4,7 +4,7 @@
   "scripts": {
     "dev:server": "pnpm --filter @etl-dashboard/server dev",
     "dev:web": "pnpm --filter @etl-dashboard/web dev",
-    "dev": "concurrently -n server,web -c blue,green \"pnpm run dev:server\" \"pnpm run dev:web\"",
+    "dev": "pnpm run dev:server & pnpm run dev:web",
     "build:shared": "pnpm --filter @etl-dashboard/shared build",
     "build:server": "pnpm --filter @etl-dashboard/server build",
     "build:web": "pnpm --filter @etl-dashboard/web build",
@@ -28,7 +28,6 @@
     ]
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0",
-    "concurrently": "^9.2.1"
+    "@playwright/test": "^1.55.0"
   }
 }

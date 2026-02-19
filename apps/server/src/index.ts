@@ -24,6 +24,8 @@ import pipelineRoutes from './modules/pipeline/pipeline.routes.js';
 import syncRoutes from './modules/sync/sync.routes.js';
 import { adminRoutes, settingsRepository } from './modules/admin/index.js';
 import { publicRoutes } from './modules/public/index.js';
+import apiKeyRoutes from './modules/api-keys/api-keys.routes.js';
+import v1Routes from './modules/public-api/v1.routes.js';
 
 const app = express();
 
@@ -53,6 +55,8 @@ app.use('/api/datasets/:id', syncRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/public', publicRoutes);   // No auth — published dashboards only
+app.use('/api/api-keys', apiKeyRoutes); // API key management (JWT auth)
+app.use('/api/v1', v1Routes);           // External API (API key auth)
 
 // --- Health check ---
 app.get('/api/health', (_req, res) => {

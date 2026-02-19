@@ -13,12 +13,16 @@ import { datasetRepository, datasetRowRepository } from '../dataset/dataset.repo
 import { testConnection as gsTestConnection, fetchAllCells, detectColumnType } from '../dataset/google-sheets.service.js';
 import { applyExtraction, previewToRowData } from './extractor.service.js';
 import { parseFileBuffer } from './connectors/connector.factory.js';
+import { fetchRestApi, testRestConnection, type RestConnectorConfig } from './connectors/rest.connector.js';
+import { parseExcelBuffer } from './connectors/excel.connector.js';
 import type {
   CellGrid,
   ExtractionConfig,
   ExtractionPreview,
   FetchRawResponse,
   RawSnapshot,
+  SheetUploadResult,
+  MultiSheetUploadResponse,
 } from '@etl-dashboard/shared';
 
 const log = logger.child({ module: 'source' });
@@ -47,6 +51,12 @@ export async function connectSource(
   if (sourceType === 'csv' || sourceType === 'excel') {
     // File-based sources don't need a connection test — return basic info
     return { type: sourceType, status: 'ready' };
+  }
+
+  if (sourceType === 'rest_api') {
+    const config = sourceConfig as unknown as RestConnectorConfig;
+    if (!config.url) throw new AppError(400, 'url is required for REST API connector');
+    return testRestConnection(config);
   }
 
   throw new AppError(400, `Unsupported source type: ${sourceType}`);
@@ -93,6 +103,13 @@ export async function fetchRaw(
     }
 
     const result = await fetchAllCells(spreadsheetId, sheetName);
+    data = result.data;
+    totalRows = result.totalRows;
+    totalCols = result.totalCols;
+  } else if (sourceType === 'rest_api') {
+    const config = sourceConfig as unknown as RestConnectorConfig;
+    if (!config.url) throw new AppError(400, 'url is required for REST API connector');
+    const result = await fetchRestApi(config);
     data = result.data;
     totalRows = result.totalRows;
     totalCols = result.totalCols;
@@ -241,7 +258,7 @@ export async function extractPreview(
 export async function createDatasetFromExtraction(params: {
   name: string;
   description?: string;
-  sourceType: 'google_sheets' | 'csv' | 'excel';
+  sourceType: 'google_sheets' | 'csv' | 'excel' | 'rest_api';
   sourceConfig: Record<string, unknown>;
   snapshotId: string;
   extractionConfig: ExtractionConfig;
@@ -300,5 +317,161 @@ export async function createDatasetFromExtraction(params: {
     dataset,
     rowCount: rowData.length,
     columns,
+  };
+}
+
+/**
+ * Parse multiple sheets from an Excel buffer and save each as a raw snapshot.
+ * Used for multi-sheet wizard: "separate datasets" or "merge" mode.
+ *
+ * @param buffer - Excel file buffer
+ * @param originalName - Original filename (used to detect type)
+ * @param sheetNames - Which sheets to parse (empty = all sheets)
+ * @returns All available sheet names + parsed results per requested sheet
+ * @throws AppError(400) if file is not Excel or sheets not found
+ */
+export async function uploadMultipleSheets(
+  buffer: Buffer,
+  originalName: string,
+  sheetNames: string[],
+): Promise<MultiSheetUploadResponse> {
+  const ext = path.extname(originalName).toLowerCase().replace('.', '');
+  if (ext !== 'xlsx' && ext !== 'xls') {
+    throw new AppError(400, 'Multi-sheet upload only supported for Excel (.xlsx, .xls) files');
+  }
+
+  log.info('Uploading multiple sheets', { sheets: sheetNames });
+
+  // Get all sheet names from workbook first
+  const firstResult = parseExcelBuffer(buffer);
+  const allSheetNames = firstResult.sheetNames;
+
+  // If no specific sheets requested, use all
+  const targetSheets = sheetNames.length > 0 ? sheetNames : allSheetNames;
+
+  // Parse each sheet and save as separate snapshot
+  const sheets: SheetUploadResult[] = [];
+
+  for (const sheetName of targetSheets) {
+    const result = parseExcelBuffer(buffer, sheetName);
+    const sourceHash = hashGrid(result.data);
+
+    const snapshot = await snapshotRepository.create({
+      datasetId: null,
+      snapshotData: result.data,
+      totalRows: result.totalRows,
+      totalCols: result.totalCols,
+      sourceHash,
+    });
+
+    sheets.push({
+      sheetName,
+      snapshotId: snapshot.id,
+      data: result.data,
+      totalRows: result.totalRows,
+      totalCols: result.totalCols,
+    });
+
+    log.info('Sheet snapshot saved', { sheetName, snapshotId: snapshot.id });
+  }
+
+  return { allSheetNames, sheets };
+}
+
+/**
+ * Merge multiple snapshots row-wise into a single CellGrid for preview.
+ * All snapshots must have the same column structure.
+ * Headers are taken from the first snapshot; subsequent snapshots skip their header rows.
+ *
+ * @param snapshotIds - Snapshot IDs to merge in order
+ * @param config - Extraction config to apply to merged data
+ * @returns Extraction preview of merged dataset
+ * @throws AppError(404) if any snapshot not found
+ */
+export async function mergeSheetsPreview(
+  snapshotIds: string[],
+  config: ExtractionConfig,
+): Promise<ExtractionPreview> {
+  if (snapshotIds.length === 0) {
+    throw new AppError(400, 'At least one snapshot ID is required');
+  }
+
+  const grids: CellGrid[] = [];
+
+  for (const id of snapshotIds) {
+    const snapshot = await getSnapshot(id);
+    grids.push(snapshot.snapshotData as CellGrid);
+  }
+
+  // Merge: first grid as-is, subsequent grids skip header rows
+  const headerRows = config.headerRowIndices.length > 0
+    ? Math.max(...config.headerRowIndices) + 1
+    : config.dataStartRow;
+
+  const merged: CellGrid = [...grids[0]];
+  for (let i = 1; i < grids.length; i++) {
+    // Skip header rows from subsequent grids
+    merged.push(...grids[i].slice(headerRows));
+  }
+
+  log.info('Sheets merged for preview', {
+    sheets: snapshotIds.length,
+    totalRows: merged.length,
+  });
+
+  return applyExtraction(merged, config);
+}
+
+/**
+ * Merge multiple sheet snapshots row-wise, save as a new raw snapshot.
+ * Used for the wizard merge-mode flow to get a combined snapshotId for extraction.
+ * Subsequent grids skip their first row (assumed header row).
+ *
+ * @param snapshotIds - Snapshot IDs to merge in order
+ * @returns Merged snapshot info (same shape as fetch-raw)
+ * @throws AppError(404) if any snapshot not found
+ */
+export async function mergeAndSaveSnapshot(snapshotIds: string[]): Promise<{
+  snapshotId: string;
+  data: CellGrid;
+  totalRows: number;
+  totalCols: number;
+}> {
+  if (snapshotIds.length === 0) {
+    throw new AppError(400, 'At least one snapshot ID is required');
+  }
+
+  const grids: CellGrid[] = [];
+  for (const id of snapshotIds) {
+    const snapshot = await getSnapshot(id);
+    grids.push(snapshot.snapshotData as CellGrid);
+  }
+
+  // Merge: first grid as-is, subsequent grids skip first row (header)
+  const merged: CellGrid = [...grids[0]!];
+  for (let i = 1; i < grids.length; i++) {
+    merged.push(...grids[i]!.slice(1));
+  }
+
+  const sourceHash = hashGrid(merged);
+  const snapshot = await snapshotRepository.create({
+    datasetId: null,
+    snapshotData: merged,
+    totalRows: merged.length,
+    totalCols: merged[0]?.length ?? 0,
+    sourceHash,
+  });
+
+  log.info('Merged snapshot saved', {
+    sheets: snapshotIds.length,
+    snapshotId: snapshot.id,
+    totalRows: merged.length,
+  });
+
+  return {
+    snapshotId: snapshot.id,
+    data: merged,
+    totalRows: merged.length,
+    totalCols: merged[0]?.length ?? 0,
   };
 }

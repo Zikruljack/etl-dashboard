@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <label class="form-label">Source Type</label>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       <button
         v-for="option in sourceOptions"
         :key="option.value"
@@ -33,12 +33,12 @@
 
 interface Props {
   /** Currently selected source type */
-  modelValue: 'google_sheets' | 'csv' | 'excel';
+  modelValue: 'google_sheets' | 'csv' | 'excel' | 'rest_api';
 }
 
 defineProps<Props>();
 defineEmits<{
-  'update:modelValue': [value: 'google_sheets' | 'csv' | 'excel'];
+  'update:modelValue': [value: 'google_sheets' | 'csv' | 'excel' | 'rest_api'];
 }>();
 
 const sourceOptions = [
@@ -59,6 +59,12 @@ const sourceOptions = [
     label: 'Excel File',
     icon: '\uD83D\uDCCB',
     description: 'Upload .xlsx or .xls file',
+  },
+  {
+    value: 'rest_api' as const,
+    label: 'REST API',
+    icon: '\uD83C\uDF10',
+    description: 'Fetch from any HTTP endpoint',
   },
 ];
 </script>

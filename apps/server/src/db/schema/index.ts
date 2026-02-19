@@ -7,3 +7,4 @@ export { datasetSyncs, syncRunStatusEnum } from './dataset-syncs';
 export { datasetChanges, changeTypeEnum } from './dataset-changes';
 export { activityLogs } from './activity-logs';
 export { appSettings } from './app-settings';
+export { apiKeys } from './api-keys';

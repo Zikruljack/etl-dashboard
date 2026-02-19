@@ -5,3 +5,5 @@ export type * from './types/api.js';
 export type * from './types/extraction.js';
 export type * from './types/pipeline.js';
 export type * from './types/sync.js';
+export type * from './types/connector.js';
+export type * from './types/api-key.js';

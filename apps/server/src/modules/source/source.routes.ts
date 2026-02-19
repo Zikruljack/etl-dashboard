@@ -16,13 +16,13 @@ router.use(authenticate);
 
 /** Validation: test connection to source */
 const connectSchema = z.object({
-  sourceType: z.enum(['google_sheets', 'csv', 'excel']),
+  sourceType: z.enum(['google_sheets', 'csv', 'excel', 'rest_api']),
   sourceConfig: z.record(z.string(), z.unknown()),
 });
 
 /** Validation: fetch raw data from source */
 const fetchRawSchema = z.object({
-  sourceType: z.enum(['google_sheets', 'csv', 'excel']),
+  sourceType: z.enum(['google_sheets', 'csv', 'excel', 'rest_api']),
   sourceConfig: z.record(z.string(), z.unknown()),
   datasetId: z.string().uuid().optional(),
 });
@@ -51,10 +51,16 @@ const extractPreviewSchema = z.object({
 const createFromExtractionSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().max(1000).optional(),
-  sourceType: z.enum(['google_sheets', 'csv', 'excel']),
+  sourceType: z.enum(['google_sheets', 'csv', 'excel', 'rest_api']),
   sourceConfig: z.record(z.string(), z.unknown()),
   snapshotId: z.string().uuid(),
   extractionConfig: extractionConfigSchema,
+});
+
+/** Validation: merge sheets preview */
+const mergeSheetsPreviewSchema = z.object({
+  snapshotIds: z.array(z.string().uuid()).min(1),
+  config: extractionConfigSchema,
 });
 
 /**
@@ -142,6 +148,63 @@ router.get('/snapshot/:id', async (req, res, next) => {
   try {
     const snapshot = await sourceService.getSnapshot(req.params.id as string);
     sendSuccess(res, snapshot);
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/sources/upload-multi-sheet
+ * Upload an Excel file and parse multiple sheets as separate snapshots.
+ * Accepts multipart/form-data with field 'file' and optional 'sheetNames' (JSON array string).
+ * Returns all sheet names + snapshot per requested sheet.
+ */
+router.post('/upload-multi-sheet', requireRole('admin', 'editor'), ...uploadFile('file'), async (req, res, next) => {
+  try {
+    let sheetNames: string[] = [];
+    if (req.body.sheetNames) {
+      try {
+        sheetNames = JSON.parse(req.body.sheetNames as string) as string[];
+      } catch {
+        sheetNames = [];
+      }
+    }
+    const result = await sourceService.uploadMultipleSheets(
+      req.file!.buffer,
+      req.file!.originalname,
+      sheetNames,
+    );
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /api/sources/merge-preview
+ * Merge multiple snapshots into one and return extraction preview.
+ */
+router.post('/merge-preview', requireRole('admin', 'editor'), validate(mergeSheetsPreviewSchema), async (req, res, next) => {
+  try {
+    const result = await sourceService.mergeSheetsPreview(
+      req.body.snapshotIds as string[],
+      req.body.config,
+    );
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+});
+
+/** Validation: merge snapshot request */
+const mergeSnapshotSchema = z.object({
+  snapshotIds: z.array(z.string().uuid()).min(1),
+});
+
+/**
+ * POST /api/sources/merge-snapshot
+ * Merge multiple sheet snapshots row-wise, save as a new raw snapshot.
+ * Returns same shape as fetch-raw: { snapshotId, data, totalRows, totalCols }.
+ * Used by the wizard merge-mode flow to create a single merged snapshot for extraction.
+ */
+router.post('/merge-snapshot', requireRole('admin', 'editor'), validate(mergeSnapshotSchema), async (req, res, next) => {
+  try {
+    const result = await sourceService.mergeAndSaveSnapshot(req.body.snapshotIds as string[]);
+    sendSuccess(res, result);
   } catch (err) { next(err); }
 });
 

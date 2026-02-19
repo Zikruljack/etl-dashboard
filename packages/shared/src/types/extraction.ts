@@ -104,11 +104,50 @@ export interface CreateDatasetFromExtractionRequest {
   /** Dataset description */
   description?: string;
   /** Source type */
-  sourceType: 'google_sheets' | 'csv' | 'excel';
+  sourceType: 'google_sheets' | 'csv' | 'excel' | 'rest_api';
   /** Source config for re-sync */
   sourceConfig: Record<string, unknown>;
   /** Snapshot to extract from */
   snapshotId: string;
   /** Extraction configuration */
   extractionConfig: ExtractionConfig;
+}
+
+/** Mode for handling multiple Excel sheets */
+export type MultiSheetMode = 'separate' | 'merge';
+
+/**
+ * One sheet's upload result (returned per-sheet from upload-multi-sheet).
+ */
+export interface SheetUploadResult {
+  /** Sheet tab name */
+  sheetName: string;
+  /** Saved snapshot ID */
+  snapshotId: string;
+  /** Raw cell grid */
+  data: CellGrid;
+  /** Total rows */
+  totalRows: number;
+  /** Total columns */
+  totalCols: number;
+}
+
+/**
+ * Response from POST /api/sources/upload-multi-sheet.
+ */
+export interface MultiSheetUploadResponse {
+  /** All available sheet names in the workbook */
+  allSheetNames: string[];
+  /** Parsed results for the requested sheets */
+  sheets: SheetUploadResult[];
+}
+
+/**
+ * Request to merge multiple snapshots into one for preview.
+ */
+export interface MergeSheetsPreviewRequest {
+  /** Snapshot IDs to merge */
+  snapshotIds: string[];
+  /** Extraction config to preview on merged data */
+  config: ExtractionConfig;
 }
